@@ -19,9 +19,16 @@ interface BatchParameterGridProps {
 
 export function BatchParameterGrid({ onGridGenerated }: BatchParameterGridProps) {
   const [parameters, setParameters] = useState<Parameter[]>([]);
-  const [newParam, setNewParam] = useState({
+  const [newParam, setNewParam] = useState<{
+    name: string;
+    type: 'range' | 'list' | 'boolean';
+    min: number;
+    max: number;
+    step: number;
+    listValues: string;
+  }>({
     name: '',
-    type: 'range' as const,
+    type: 'range',
     min: 0,
     max: 1,
     step: 0.1,

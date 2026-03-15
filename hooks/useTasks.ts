@@ -125,7 +125,7 @@ export function useSubmitResultWithData() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ taskId, resultData }: { taskId: number; resultData: Buffer | string }) => {
+    mutationFn: async ({ taskId, resultData }: { taskId: number; resultData: Uint8Array | string }) => {
       if (!client) throw new Error('Client not initialized');
       return client.submitResultWithData(taskId, resultData);
     },

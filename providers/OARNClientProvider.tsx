@@ -173,7 +173,7 @@ class OARNClient {
 
   async submitResultWithData(
     taskId: number,
-    resultData: Buffer | string
+    resultData: Uint8Array | string
   ): Promise<{ tx: { hash: string }; resultCid: string; resultHash: string }> {
     console.log('Submitting result with data for task:', taskId);
     return {
@@ -197,8 +197,8 @@ class OARNClient {
   }
 
   async submitTaskWithData(
-    modelData: Buffer | string,
-    inputData: Buffer | string,
+    modelData: Uint8Array | string,
+    inputData: Uint8Array | string,
     rewardPerNode: bigint,
     requiredNodes: number,
     deadline: number,
@@ -254,14 +254,14 @@ class OARNClient {
   }
 
   // IPFS Operations
-  async uploadToIPFS(data: Buffer | string): Promise<string> {
+  async uploadToIPFS(data: Uint8Array | string): Promise<string> {
     console.log('Uploading to IPFS');
     return 'QmMockCID...';
   }
 
-  async downloadFromIPFS(cid: string): Promise<Buffer> {
+  async downloadFromIPFS(cid: string): Promise<Uint8Array> {
     console.log('Downloading from IPFS:', cid);
-    return Buffer.from('mock data');
+    return new TextEncoder().encode('mock data');
   }
 
   getIPFSUrl(cid: string): string {

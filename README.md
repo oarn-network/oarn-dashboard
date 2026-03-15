@@ -105,9 +105,46 @@ oarn-dashboard/
 
 ### Vercel (Recommended)
 
+#### Option 1: Deploy via Vercel Dashboard (Easiest)
+
+1. Go to [vercel.com](https://vercel.com) and sign in with GitHub
+2. Click "Add New Project"
+3. Import the `oarn-dashboard` repository
+4. Configure environment variables:
+   - `NEXT_PUBLIC_RPC_URL` = `https://sepolia-rollup.arbitrum.io/rpc`
+   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` = your WalletConnect project ID
+   - `NEXT_PUBLIC_IPFS_GATEWAY` = `https://ipfs.io/ipfs/`
+5. Click "Deploy"
+
+#### Option 2: Deploy via CLI
+
 ```bash
 npm install -g vercel
-vercel
+vercel login
+vercel --prod
 ```
 
-Set environment variables in Vercel dashboard.
+#### Get WalletConnect Project ID
+
+1. Go to [cloud.walletconnect.com](https://cloud.walletconnect.com)
+2. Create a new project
+3. Copy the Project ID
+4. Add to Vercel environment variables
+
+#### Custom Domain (Optional)
+
+1. In Vercel project settings, go to "Domains"
+2. Add your custom domain (e.g., `dashboard.oarn.network`)
+3. Configure DNS records as instructed
+
+### Environment Variables Reference
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_RPC_URL` | Yes | Arbitrum Sepolia RPC endpoint |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Yes | WalletConnect Cloud project ID |
+| `NEXT_PUBLIC_IPFS_GATEWAY` | No | IPFS gateway URL (default: ipfs.io) |
+
+## License
+
+MIT

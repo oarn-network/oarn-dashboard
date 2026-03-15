@@ -90,7 +90,7 @@ export default function BatchSubmitPage() {
           <div>
             <h3 className="font-medium text-text">Parallel Processing at Scale</h3>
             <p className="text-sm text-text-muted mt-1">
-              OARN's distributed network can process 10,000+ parameter combinations in parallel.
+              OARN distributed network can process 10,000+ parameter combinations in parallel.
               Define your hyperparameter grid, and nodes will execute each combination independently
               with consensus verification.
             </p>

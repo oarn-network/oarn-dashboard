@@ -45,7 +45,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="text-center py-20">
         <h2 className="text-xl font-semibold text-text mb-2">Task Not Found</h2>
-        <p className="text-text-muted mb-4">The task you're looking for doesn't exist.</p>
+        <p className="text-text-muted mb-4">The task you are looking for does not exist.</p>
         <Link href="/researcher/tasks">
           <Button>Back to Tasks</Button>
         </Link>

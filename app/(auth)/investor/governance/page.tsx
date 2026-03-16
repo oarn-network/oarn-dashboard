@@ -1,70 +1,169 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
-import { formatAddress, formatRelativeTime } from '@/lib/formatters';
+import { formatAddress } from '@/lib/formatters';
+import { CONTRACT_ADDRESSES, ProposalState, PROPOSAL_STATE_LABELS } from '@/lib/constants';
+import {
+  useGovernanceProposals,
+  useVotingPower,
+  useHasVoted,
+  useCastVote,
+  useDelegateGov,
+  type GovernanceProposal,
+} from '@/hooks/useGovernance';
 
-// Mock governance data
-const proposals = [
-  {
-    id: 'OIP-12',
-    title: 'Increase node reward rate by 10%',
-    description: 'This proposal aims to increase the base reward rate for node operators by 10% to attract more compute providers to the network.',
-    proposer: '0x742d35Cc6634C0532925a3b844Bc9e7595f5bEfA',
-    status: 'active',
-    votesFor: 125000,
-    votesAgainst: 48000,
-    totalVotes: 173000,
-    quorum: 200000,
-    endTime: Math.floor(Date.now() / 1000) + 86400 * 3,
-    createdAt: Math.floor(Date.now() / 1000) - 86400 * 4,
-  },
-  {
-    id: 'OIP-11',
-    title: 'Add PyTorch 2.0 support',
-    description: 'Enable native PyTorch 2.0 model support with TorchScript and torch.compile optimizations.',
-    proposer: '0x8ba1f109551bD432803012645Ac136ddd64DBA72',
-    status: 'active',
-    votesFor: 189000,
-    votesAgainst: 23000,
-    totalVotes: 212000,
-    quorum: 200000,
-    endTime: Math.floor(Date.now() / 1000) + 86400 * 1,
-    createdAt: Math.floor(Date.now() / 1000) - 86400 * 6,
-  },
-  {
-    id: 'OIP-10',
-    title: 'Reduce minimum stake requirement',
-    description: 'Lower the minimum stake requirement from 1000 COMP to 500 COMP to increase node participation.',
-    proposer: '0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97',
-    status: 'passed',
-    votesFor: 245000,
-    votesAgainst: 67000,
-    totalVotes: 312000,
-    quorum: 200000,
-    endTime: Math.floor(Date.now() / 1000) - 86400 * 2,
-    createdAt: Math.floor(Date.now() / 1000) - 86400 * 9,
-  },
-  {
-    id: 'OIP-9',
-    title: 'Treasury allocation for marketing',
-    description: 'Allocate 50,000 COMP from treasury for marketing and developer outreach initiatives.',
-    proposer: '0x742d35Cc6634C0532925a3b844Bc9e7595f5bEfA',
-    status: 'rejected',
-    votesFor: 89000,
-    votesAgainst: 156000,
-    totalVotes: 245000,
-    quorum: 200000,
-    endTime: Math.floor(Date.now() / 1000) - 86400 * 10,
-    createdAt: Math.floor(Date.now() / 1000) - 86400 * 17,
-  },
-];
+// ── Proposal state → badge variant mapping ────────────────────────
+
+const STATE_BADGE: Record<ProposalState, { variant: 'accent' | 'success' | 'error' | 'warning'; label: string }> = {
+  [ProposalState.Pending]:   { variant: 'warning', label: 'Pending' },
+  [ProposalState.Active]:    { variant: 'accent',  label: 'Active' },
+  [ProposalState.Canceled]:  { variant: 'error',   label: 'Canceled' },
+  [ProposalState.Defeated]:  { variant: 'error',   label: 'Defeated' },
+  [ProposalState.Succeeded]: { variant: 'success', label: 'Succeeded' },
+  [ProposalState.Queued]:    { variant: 'warning', label: 'Queued' },
+  [ProposalState.Expired]:   { variant: 'error',   label: 'Expired' },
+  [ProposalState.Executed]:  { variant: 'success', label: 'Executed' },
+};
+
+// ── Govenance not yet deployed banner ─────────────────────────────
+
+function NotDeployedBanner() {
+  return (
+    <Card className="border border-warning/40 bg-warning/5">
+      <div className="flex items-start gap-3">
+        <span className="text-warning text-lg">⚠</span>
+        <div>
+          <p className="text-sm font-medium text-text">Governance Contract Not Yet Deployed</p>
+          <p className="text-xs text-text-muted mt-1">
+            The DAO governance contract is being activated on Arbitrum Sepolia. Once deployed,
+            live proposals and voting will appear here.
+          </p>
+          <p className="text-xs text-text-muted mt-1 font-mono">
+            Deploy: <code>npx hardhat run scripts/deploy-governance.ts --network arbitrumSepolia</code>
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── Vote button group ─────────────────────────────────────────────
+
+function VoteButtons({ proposal }: { proposal: GovernanceProposal }) {
+  const { data: hasVoted } = useHasVoted(proposal.idBigInt);
+  const { mutate: castVote, isPending } = useCastVote();
+  const [voted, setVoted] = useState(false);
+
+  if (hasVoted || voted) {
+    return <p className="text-xs text-text-muted text-center">You have voted on this proposal.</p>;
+  }
+
+  const vote = (support: 0 | 1 | 2) => {
+    castVote({ proposalId: proposal.idBigInt, support }, { onSuccess: () => setVoted(true) });
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Button size="sm" className="flex-1" onClick={() => vote(1)} disabled={isPending}>Vote For</Button>
+      <Button size="sm" variant="secondary" className="flex-1" onClick={() => vote(0)} disabled={isPending}>Vote Against</Button>
+      <Button size="sm" variant="secondary" onClick={() => vote(2)} disabled={isPending}>Abstain</Button>
+    </div>
+  );
+}
+
+// ── Proposal card ─────────────────────────────────────────────────
+
+function ProposalCard({ proposal }: { proposal: GovernanceProposal }) {
+  const isActive = proposal.state === ProposalState.Active;
+  const quorumGov = 4_000_000; // 4% of 100M
+  const totalVotesNum = Number(proposal.totalVotes) / 1e18;
+  const quorumPercent = Math.min(Math.round((totalVotesNum / quorumGov) * 100), 100);
+  const quorumReached = totalVotesNum >= quorumGov;
+  const { variant, label } = STATE_BADGE[proposal.state] ?? STATE_BADGE[ProposalState.Pending];
+
+  return (
+    <Card>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        {/* Left – info */}
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <span className="text-sm font-mono text-primary">#{proposal.id.slice(0, 8)}…</span>
+            <Badge variant={variant} size="sm">{label}</Badge>
+            {quorumReached && <Badge variant="success" size="sm">Quorum Reached</Badge>}
+          </div>
+          <h3 className="text-lg font-semibold text-text mb-2">{proposal.title}</h3>
+          <p className="text-sm text-text-muted mb-3 line-clamp-2">{proposal.description.split('\n')[0]}</p>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted">
+            <span>Proposed by {formatAddress(proposal.proposer)}</span>
+            <span>•</span>
+            <span>Voting block: {proposal.startBlock.toString()}–{proposal.endBlock.toString()}</span>
+          </div>
+        </div>
+
+        {/* Right – votes */}
+        <div className="lg:w-72 lg:flex-shrink-0">
+          <div className="space-y-2 mb-4">
+            <div>
+              <div className="flex items-center justify-between text-sm mb-1">
+                <span className="text-success">For</span>
+                <span className="text-text">
+                  {(Number(proposal.forVotes) / 1e18).toLocaleString('en', { maximumFractionDigits: 0 })} ({proposal.forPercent}%)
+                </span>
+              </div>
+              <div className="h-2 bg-background-light rounded-full overflow-hidden">
+                <div className="h-full bg-success" style={{ width: `${proposal.forPercent}%` }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between text-sm mb-1">
+                <span className="text-error">Against</span>
+                <span className="text-text">
+                  {(Number(proposal.againstVotes) / 1e18).toLocaleString('en', { maximumFractionDigits: 0 })} ({100 - proposal.forPercent}%)
+                </span>
+              </div>
+              <div className="h-2 bg-background-light rounded-full overflow-hidden">
+                <div className="h-full bg-error" style={{ width: `${100 - proposal.forPercent}%` }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Quorum */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-text-muted">Quorum (4M GOV needed)</span>
+              <span className={quorumReached ? 'text-success' : 'text-text'}>{quorumPercent}%</span>
+            </div>
+            <div className="h-1.5 bg-background-light rounded-full overflow-hidden">
+              <div
+                className={`h-full ${quorumReached ? 'bg-success' : 'bg-primary'}`}
+                style={{ width: `${quorumPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {isActive && <VoteButtons proposal={proposal} />}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────
 
 export default function GovernancePage() {
-  const activeProposals = proposals.filter((p) => p.status === 'active');
-  const pastProposals = proposals.filter((p) => p.status !== 'active');
+  const { data: proposals = [], isLoading } = useGovernanceProposals();
+  const { data: votingPower } = useVotingPower();
+  const { mutate: delegate, isPending: isDelegating } = useDelegateGov();
 
-  // Mock user's voting power
-  const votingPower = 1500;
+  const governanceDeployed = CONTRACT_ADDRESSES.GOVERNANCE !== '';
+
+  const activeProposals = proposals.filter((p) =>
+    p.state === ProposalState.Active || p.state === ProposalState.Pending,
+  );
+  const pastProposals = proposals.filter((p) =>
+    p.state !== ProposalState.Active && p.state !== ProposalState.Pending,
+  );
 
   return (
     <div className="space-y-8">
@@ -72,160 +171,84 @@ export default function GovernancePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text">Governance</h1>
-          <p className="text-text-muted mt-1">Participate in OARN network governance</p>
+          <p className="text-text-muted mt-1">Participate in OARN network governance with GOV tokens</p>
         </div>
         <Card padding="sm" className="flex items-center gap-4">
           <div>
             <p className="text-xs text-text-muted">Your Voting Power</p>
-            <p className="text-lg font-bold text-text">{votingPower.toLocaleString()} GOV</p>
+            <p className="text-lg font-bold text-text">
+              {votingPower?.formattedVotes ?? '0'} GOV
+            </p>
           </div>
-          <Button size="sm">Delegate</Button>
+          {votingPower && !votingPower.isDelegated && (
+            <Button size="sm" onClick={() => delegate()} disabled={isDelegating}>
+              {isDelegating ? 'Delegating…' : 'Activate'}
+            </Button>
+          )}
+          {votingPower?.isDelegated && (
+            <span className="text-xs text-success">Active</span>
+          )}
         </Card>
       </div>
 
-      {/* Active Proposals */}
+      {/* Not-deployed banner */}
+      {!governanceDeployed && <NotDeployedBanner />}
+
+      {/* Voting power hint */}
+      {votingPower && !votingPower.isDelegated && votingPower.votes > BigInt(0) && (
+        <Card className="border border-accent/30 bg-accent/5">
+          <p className="text-sm text-text">
+            You hold GOV tokens but have not activated voting. Click <strong>Activate</strong> to delegate to yourself and enable voting.
+          </p>
+        </Card>
+      )}
+
+      {/* Active proposals */}
       <div>
         <h2 className="text-lg font-semibold text-text mb-4">Active Proposals</h2>
         <div className="space-y-4">
-          {activeProposals.map((proposal) => (
-            <ProposalCard key={proposal.id} proposal={proposal} />
-          ))}
-          {activeProposals.length === 0 && (
+          {isLoading && (
             <Card className="text-center py-8">
-              <p className="text-text-muted">No active proposals</p>
+              <p className="text-text-muted">Loading proposals…</p>
+            </Card>
+          )}
+          {!isLoading && activeProposals.map((p) => (
+            <ProposalCard key={p.id} proposal={p} />
+          ))}
+          {!isLoading && activeProposals.length === 0 && (
+            <Card className="text-center py-8">
+              <p className="text-text-muted">
+                {governanceDeployed ? 'No active proposals' : 'Governance not yet deployed'}
+              </p>
             </Card>
           )}
         </div>
       </div>
 
-      {/* Past Proposals */}
-      <div>
-        <h2 className="text-lg font-semibold text-text mb-4">Past Proposals</h2>
-        <div className="space-y-4">
-          {pastProposals.map((proposal) => (
-            <ProposalCard key={proposal.id} proposal={proposal} />
-          ))}
+      {/* Past proposals */}
+      {pastProposals.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-text mb-4">Past Proposals</h2>
+          <div className="space-y-4">
+            {pastProposals.map((p) => (
+              <ProposalCard key={p.id} proposal={p} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Info box */}
+      <Card className="bg-background-elevated">
+        <h3 className="font-semibold text-text mb-2">How Governance Works</h3>
+        <ul className="text-sm text-text-muted space-y-1">
+          <li>• Hold GOV tokens and click <strong>Activate</strong> to enable voting power</li>
+          <li>• 1,000 GOV required to create a proposal</li>
+          <li>• Proposals wait 1 day before voting opens</li>
+          <li>• Voting period: 1 week</li>
+          <li>• Quorum: 4% of total supply (4,000,000 GOV)</li>
+          <li>• Passing: simple majority of cast votes</li>
+        </ul>
+      </Card>
     </div>
-  );
-}
-
-interface Proposal {
-  id: string;
-  title: string;
-  description: string;
-  proposer: string;
-  status: string;
-  votesFor: number;
-  votesAgainst: number;
-  totalVotes: number;
-  quorum: number;
-  endTime: number;
-  createdAt: number;
-}
-
-function ProposalCard({ proposal }: { proposal: Proposal }) {
-  const forPercentage = proposal.totalVotes > 0
-    ? Math.round((proposal.votesFor / proposal.totalVotes) * 100)
-    : 0;
-
-  const quorumPercentage = Math.round((proposal.totalVotes / proposal.quorum) * 100);
-  const quorumReached = proposal.totalVotes >= proposal.quorum;
-
-  const statusConfig: Record<string, { variant: 'accent' | 'success' | 'error'; label: string }> = {
-    active: { variant: 'accent', label: 'Active' },
-    passed: { variant: 'success', label: 'Passed' },
-    rejected: { variant: 'error', label: 'Rejected' },
-  };
-
-  const { variant, label } = statusConfig[proposal.status] || statusConfig.active;
-
-  const now = Math.floor(Date.now() / 1000);
-  const isActive = proposal.status === 'active';
-  const timeRemaining = proposal.endTime - now;
-  const daysRemaining = Math.floor(timeRemaining / 86400);
-  const hoursRemaining = Math.floor((timeRemaining % 86400) / 3600);
-
-  return (
-    <Card>
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        {/* Left - Info */}
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-sm font-mono text-primary">{proposal.id}</span>
-            <Badge variant={variant} size="sm">{label}</Badge>
-            {quorumReached && (
-              <Badge variant="success" size="sm">Quorum Reached</Badge>
-            )}
-          </div>
-          <h3 className="text-lg font-semibold text-text mb-2">{proposal.title}</h3>
-          <p className="text-sm text-text-muted mb-3">{proposal.description}</p>
-          <div className="flex flex-wrap items-center gap-4 text-xs text-text-muted">
-            <span>Proposed by {formatAddress(proposal.proposer)}</span>
-            <span>•</span>
-            <span>Created {formatRelativeTime(proposal.createdAt)}</span>
-            {isActive && (
-              <>
-                <span>•</span>
-                <span className="text-warning">
-                  {daysRemaining > 0 ? `${daysRemaining}d ` : ''}
-                  {hoursRemaining}h remaining
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Right - Votes */}
-        <div className="lg:w-72 lg:flex-shrink-0">
-          {/* Vote bars */}
-          <div className="space-y-2 mb-4">
-            <div>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-success">For</span>
-                <span className="text-text">{(proposal.votesFor / 1000).toFixed(0)}K ({forPercentage}%)</span>
-              </div>
-              <div className="h-2 bg-background-light rounded-full overflow-hidden">
-                <div className="h-full bg-success" style={{ width: `${forPercentage}%` }} />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-error">Against</span>
-                <span className="text-text">{(proposal.votesAgainst / 1000).toFixed(0)}K ({100 - forPercentage}%)</span>
-              </div>
-              <div className="h-2 bg-background-light rounded-full overflow-hidden">
-                <div className="h-full bg-error" style={{ width: `${100 - forPercentage}%` }} />
-              </div>
-            </div>
-          </div>
-
-          {/* Quorum progress */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-text-muted">Quorum Progress</span>
-              <span className={quorumReached ? 'text-success' : 'text-text'}>
-                {quorumPercentage}%
-              </span>
-            </div>
-            <div className="h-1.5 bg-background-light rounded-full overflow-hidden">
-              <div
-                className={`h-full ${quorumReached ? 'bg-success' : 'bg-primary'}`}
-                style={{ width: `${Math.min(quorumPercentage, 100)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Vote buttons */}
-          {isActive && (
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1">Vote For</Button>
-              <Button size="sm" variant="secondary" className="flex-1">Vote Against</Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </Card>
   );
 }

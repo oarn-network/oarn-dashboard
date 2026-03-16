@@ -16,6 +16,13 @@ export {
 } from './useTasks';
 export { useBalance, useMyBalance } from './useBalance';
 export {
+  useGovernanceProposals,
+  useVotingPower,
+  useHasVoted,
+  useCastVote,
+  useDelegateGov,
+} from './useGovernance';
+export {
   useActiveProviders,
   useNetworkStats,
   useNetworkHistory,

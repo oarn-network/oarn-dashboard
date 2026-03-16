@@ -4,6 +4,8 @@ export const CONTRACT_ADDRESSES = {
   TASK_REGISTRY: '0xD15530ce13188EE88E43Ab07EDD9E8729fCc55D0',
   COMP_TOKEN: '0x24249A523A251E38CB0001daBd54DD44Ea8f1838',
   GOV_TOKEN: '0xB97eDD49C225d2c43e7203aB9248cAbED2B268d3',
+  // Deployed after running: npx hardhat run scripts/deploy-governance.ts --network arbitrumSepolia
+  GOVERNANCE: '' as string,
 } as const;
 
 // Chain configuration
@@ -74,6 +76,29 @@ export const CONSENSUS_TYPE_LABELS: Record<ConsensusType, string> = {
   [ConsensusType.Majority]: 'Majority',
   [ConsensusType.SuperMajority]: 'Super Majority',
   [ConsensusType.Unanimous]: 'Unanimous',
+};
+
+// Governance — ProposalState values match OpenZeppelin Governor
+export enum ProposalState {
+  Pending = 0,   // waiting for voting delay
+  Active = 1,    // voting open
+  Canceled = 2,
+  Defeated = 3,
+  Succeeded = 4,
+  Queued = 5,
+  Expired = 6,
+  Executed = 7,
+}
+
+export const PROPOSAL_STATE_LABELS: Record<ProposalState, string> = {
+  [ProposalState.Pending]: 'Pending',
+  [ProposalState.Active]: 'Active',
+  [ProposalState.Canceled]: 'Canceled',
+  [ProposalState.Defeated]: 'Defeated',
+  [ProposalState.Succeeded]: 'Succeeded',
+  [ProposalState.Queued]: 'Queued',
+  [ProposalState.Expired]: 'Expired',
+  [ProposalState.Executed]: 'Executed',
 };
 
 // Model frameworks

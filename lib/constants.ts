@@ -4,8 +4,7 @@ export const CONTRACT_ADDRESSES = {
   TASK_REGISTRY: '0xD15530ce13188EE88E43Ab07EDD9E8729fCc55D0',
   COMP_TOKEN: '0x24249A523A251E38CB0001daBd54DD44Ea8f1838',
   GOV_TOKEN: '0xB97eDD49C225d2c43e7203aB9248cAbED2B268d3',
-  // Deployed after running: npx hardhat run scripts/deploy-governance.ts --network arbitrumSepolia
-  GOVERNANCE: '' as string,
+  GOVERNANCE: '0x56D2826FF4FaEF8d4Db54eF11e86d0421fc2893B' as string,
 } as const;
 
 // Chain configuration

@@ -156,6 +156,12 @@ export default function GovernancePage() {
   const { data: votingPower } = useVotingPower();
   const { mutate: delegate, isPending: isDelegating } = useDelegateGov();
 
+  // DEBUG — remove after verifying
+  if (typeof window !== 'undefined') {
+    console.log('[GOV DEBUG] votingPower:', votingPower);
+    console.log('[GOV DEBUG] GOV_TOKEN:', CONTRACT_ADDRESSES.GOV_TOKEN);
+  }
+
   const governanceDeployed = CONTRACT_ADDRESSES.GOVERNANCE !== '';
 
   const activeProposals = proposals.filter((p) =>

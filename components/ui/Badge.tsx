@@ -39,7 +39,7 @@ function Badge({ children, variant = 'default', size = 'md', className = '', ...
 
 // Status badge for tasks
 interface StatusBadgeProps {
-  status: 'pending' | 'active' | 'completed' | 'cancelled' | 'expired';
+  status: 'pending' | 'active' | 'consensus' | 'completed' | 'disputed' | 'cancelled' | 'expired';
   size?: BadgeSize;
 }
 
@@ -47,7 +47,9 @@ function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
   const config: Record<string, { variant: BadgeVariant; label: string }> = {
     pending: { variant: 'warning', label: 'Pending' },
     active: { variant: 'accent', label: 'Active' },
+    consensus: { variant: 'accent', label: 'Consensus' },
     completed: { variant: 'success', label: 'Completed' },
+    disputed: { variant: 'error', label: 'Disputed' },
     cancelled: { variant: 'error', label: 'Cancelled' },
     expired: { variant: 'error', label: 'Expired' },
   };

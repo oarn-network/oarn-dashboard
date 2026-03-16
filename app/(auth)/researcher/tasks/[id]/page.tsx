@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, Button, Badge, StatusBadge, Spinner, useToast } from '@/components/ui';
 import { useTask, useConsensusStatus, useTaskNodes, useCancelTask } from '@/hooks';
 import { formatEth, formatAddress, formatHash, formatDeadline, formatDateTime, getArbiscanUrl } from '@/lib/formatters';
-import { TaskStatus, TASK_STATUS_LABELS } from '@/lib/constants';
+import { TaskStatus, ConsensusType, TASK_STATUS_LABELS, CONSENSUS_TYPE_LABELS } from '@/lib/constants';
 
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -56,12 +56,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const statusKey = TASK_STATUS_LABELS[task.status].toLowerCase() as
     | 'pending'
     | 'active'
+    | 'consensus'
     | 'completed'
+    | 'disputed'
     | 'cancelled'
     | 'expired';
 
   const totalReward = BigInt(task.rewardPerNode) * BigInt(task.requiredNodes);
-  const progress = task.requiredNodes > 0 ? Math.round((task.completedNodes / task.requiredNodes) * 100) : 0;
+  const progress = task.requiredNodes > 0 ? Math.round(((task.completedNodes ?? 0) / task.requiredNodes) * 100) : 0;
 
   return (
     <div className="space-y-8">
@@ -222,7 +224,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               <div className="flex items-center justify-between">
                 <span className="text-sm text-text-muted">Consensus Type</span>
                 <Badge size="sm" variant="primary">
-                  {task.consensusType === 1 ? 'Majority' : task.consensusType === 2 ? 'Unanimous' : 'None'}
+                  {CONSENSUS_TYPE_LABELS[task.consensusType as ConsensusType] ?? 'Unknown'}
                 </Badge>
               </div>
             </div>

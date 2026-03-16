@@ -32,19 +32,23 @@ export const IPFS_CONFIG = {
   apiUrl: 'http://127.0.0.1:5001/api/v0',
 } as const;
 
-// Task statuses
+// Task statuses — values match on-chain TaskRegistryV2 enum
 export enum TaskStatus {
   Pending = 0,
   Active = 1,
-  Completed = 2,
-  Cancelled = 3,
-  Expired = 4,
+  Consensus = 2,
+  Completed = 3,
+  Disputed = 4,
+  Cancelled = 5,
+  Expired = 6,
 }
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   [TaskStatus.Pending]: 'Pending',
   [TaskStatus.Active]: 'Active',
+  [TaskStatus.Consensus]: 'Consensus',
   [TaskStatus.Completed]: 'Completed',
+  [TaskStatus.Disputed]: 'Disputed',
   [TaskStatus.Cancelled]: 'Cancelled',
   [TaskStatus.Expired]: 'Expired',
 };
@@ -52,21 +56,23 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
   [TaskStatus.Pending]: 'warning',
   [TaskStatus.Active]: 'accent',
+  [TaskStatus.Consensus]: 'accent',
   [TaskStatus.Completed]: 'success',
+  [TaskStatus.Disputed]: 'error',
   [TaskStatus.Cancelled]: 'error',
   [TaskStatus.Expired]: 'error',
 };
 
-// Consensus types
+// Consensus types — values match on-chain enum
 export enum ConsensusType {
-  None = 0,
-  Majority = 1,
+  Majority = 0,
+  SuperMajority = 1,
   Unanimous = 2,
 }
 
 export const CONSENSUS_TYPE_LABELS: Record<ConsensusType, string> = {
-  [ConsensusType.None]: 'None',
   [ConsensusType.Majority]: 'Majority',
+  [ConsensusType.SuperMajority]: 'Super Majority',
   [ConsensusType.Unanimous]: 'Unanimous',
 };
 

@@ -127,7 +127,9 @@ export function useSubmitResultWithData() {
   return useMutation({
     mutationFn: async ({ taskId, resultData }: { taskId: number; resultData: Uint8Array | string }) => {
       if (!client) throw new Error('Client not initialized');
-      return client.submitResultWithData(taskId, resultData);
+      // submitResultWithData not supported in browser; use submitResult with pre-computed hash
+      const hash = typeof resultData === 'string' ? resultData : '';
+      return client.submitResult(taskId, hash);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });

@@ -2,7 +2,7 @@
 
 import { Card, Button, StatusBadge, Badge } from '@/components/ui';
 import { formatEth, formatAddress, formatHash, formatDeadline } from '@/lib/formatters';
-import { TaskStatus, TASK_STATUS_LABELS } from '@/lib/constants';
+import { TaskStatus, ConsensusType, TASK_STATUS_LABELS, CONSENSUS_TYPE_LABELS } from '@/lib/constants';
 import type { Task } from '@/providers/OARNClientProvider';
 
 interface TaskCardProps {
@@ -29,12 +29,14 @@ export function TaskCard({
   const statusKey = TASK_STATUS_LABELS[task.status].toLowerCase() as
     | 'pending'
     | 'active'
+    | 'consensus'
     | 'completed'
+    | 'disputed'
     | 'cancelled'
     | 'expired';
 
   const progress = task.requiredNodes > 0
-    ? Math.round((task.completedNodes / task.requiredNodes) * 100)
+    ? Math.round(((task.completedNodes ?? 0) / task.requiredNodes) * 100)
     : 0;
 
   const totalReward = BigInt(task.rewardPerNode) * BigInt(task.requiredNodes);
@@ -67,7 +69,7 @@ export function TaskCard({
         </div>
         {task.consensusType !== undefined && (
           <Badge variant="primary" size="sm">
-            {task.consensusType === 1 ? 'Majority' : task.consensusType === 2 ? 'Unanimous' : 'None'}
+            {CONSENSUS_TYPE_LABELS[task.consensusType as ConsensusType] ?? 'Unknown'}
           </Badge>
         )}
       </div>
@@ -80,7 +82,7 @@ export function TaskCard({
         {task.status === TaskStatus.Pending
           ? 'Waiting for nodes to claim this task'
           : task.status === TaskStatus.Active
-          ? `${task.completedNodes} of ${task.requiredNodes} nodes have submitted results`
+          ? `${task.completedNodes ?? 0} of ${task.requiredNodes} nodes have submitted results`
           : task.status === TaskStatus.Completed
           ? 'Task completed with consensus reached'
           : 'Task is no longer active'}
@@ -111,7 +113,7 @@ export function TaskCard({
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm mb-1">
             <span className="text-text-muted">Progress</span>
-            <span className="text-text">{task.completedNodes}/{task.requiredNodes} nodes</span>
+            <span className="text-text">{task.completedNodes ?? 0}/{task.requiredNodes} nodes</span>
           </div>
           <div className="h-2 bg-background-light rounded-full overflow-hidden">
             <div

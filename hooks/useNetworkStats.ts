@@ -1,8 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { formatUnits } from 'viem';
 import { useOARNClient } from '@/providers/OARNClientProvider';
-import { REFRESH_INTERVALS } from '@/lib/constants';
+import type { Task } from '@/providers/OARNClientProvider';
+import { REFRESH_INTERVALS, TaskStatus } from '@/lib/constants';
 
 export function useActiveProviders() {
   const { client } = useOARNClient();
@@ -27,20 +29,31 @@ export function useNetworkStats() {
           activeNodes: 0,
           completedTasks: 0,
           tvl: BigInt(0),
+          avgReward: BigInt(0),
+          tasks: [] as Task[],
         };
       }
 
-      const [taskCount, activeProviders] = await Promise.all([
-        client.getTaskCount(),
+      const [tasks, providers] = await Promise.all([
+        client.getTasks(),
         client.getActiveProviders(),
       ]);
 
-      // Mock some additional stats
+      const completedTasks = tasks.filter(t => t.status === TaskStatus.Completed).length;
+      const avgReward = tasks.length > 0
+        ? tasks.reduce((sum, t) => sum + t.rewardPerNode, BigInt(0)) / BigInt(tasks.length)
+        : BigInt(0);
+      const tvl = tasks
+        .filter(t => t.status !== TaskStatus.Cancelled && t.status !== TaskStatus.Expired)
+        .reduce((sum, t) => sum + t.rewardPerNode * BigInt(t.requiredNodes), BigInt(0));
+
       return {
-        totalTasks: taskCount,
-        activeNodes: activeProviders.length,
-        completedTasks: Math.floor(taskCount * 0.75), // Mock ~75% completion rate
-        tvl: BigInt('50000000000000000000'), // Mock 50 ETH TVL
+        totalTasks: tasks.length,
+        activeNodes: providers.length,
+        completedTasks,
+        tvl,
+        avgReward,
+        tasks,
       };
     },
     enabled: !!client,
@@ -48,22 +61,43 @@ export function useNetworkStats() {
   });
 }
 
-// Mock historical data for charts
 export function useNetworkHistory(days: number = 30) {
+  const { client } = useOARNClient();
+
   return useQuery({
     queryKey: ['networkHistory', days],
-    queryFn: () => {
-      // Generate mock historical data
-      const data = [];
+    queryFn: async () => {
+      const data: { date: string; tasks: number; nodes: number; earnings: number }[] = [];
       const now = Date.now();
+
+      const [tasks, providers] = await Promise.all([
+        client?.getTasks() ?? Promise.resolve([]),
+        client?.getActiveProviders() ?? Promise.resolve([]),
+      ]);
+
+      const totalTasks = tasks.length;
+      const nodeCount = providers.length;
 
       for (let i = days; i >= 0; i--) {
         const date = new Date(now - i * 24 * 60 * 60 * 1000);
+        const slotIdx = days - i; // 0 = oldest, days = today
+
+        // Cumulative task count at this slot (tasks ~= sequential by time)
+        const cumulative = totalTasks > 0 ? Math.round(totalTasks * slotIdx / days) : 0;
+        const prevCumulative = totalTasks > 0 && slotIdx > 0
+          ? Math.round(totalTasks * (slotIdx - 1) / days)
+          : 0;
+
+        const slotTasks = tasks.slice(prevCumulative, cumulative);
+        const earnings = slotTasks.reduce((s, t) => {
+          return s + parseFloat(formatUnits(t.rewardPerNode * BigInt(t.requiredNodes), 18));
+        }, 0);
+
         data.push({
           date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          tasks: Math.floor(50 + Math.random() * 100 + (days - i) * 2),
-          nodes: Math.floor(5 + Math.random() * 10 + (days - i) * 0.3),
-          earnings: parseFloat((0.5 + Math.random() * 2 + (days - i) * 0.05).toFixed(2)),
+          tasks: cumulative,
+          nodes: nodeCount,
+          earnings: parseFloat(earnings.toFixed(4)),
         });
       }
 
@@ -73,33 +107,151 @@ export function useNetworkHistory(days: number = 30) {
   });
 }
 
-// Mock earnings history for node operators
 export function useEarningsHistory(days: number = 30) {
-  const { address } = useOARNClient();
+  const { client, address } = useOARNClient();
 
   return useQuery({
     queryKey: ['earningsHistory', address, days],
-    queryFn: () => {
-      if (!address) return [];
+    queryFn: async () => {
+      if (!address || !client) return [];
 
-      // Generate mock earnings data
-      const data = [];
-      const now = Date.now();
+      const events = await client.getRewardDistributedEvents(address);
 
-      for (let i = days; i >= 0; i--) {
-        const date = new Date(now - i * 24 * 60 * 60 * 1000);
-        const hasEarnings = Math.random() > 0.3;
-
-        data.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          earnings: hasEarnings ? parseFloat((Math.random() * 0.5).toFixed(4)) : 0,
-          tasks: hasEarnings ? Math.floor(Math.random() * 5) + 1 : 0,
-        });
+      if (events.length === 0) {
+        const result = [];
+        const now = Date.now();
+        for (let i = days; i >= 0; i--) {
+          const date = new Date(now - i * 24 * 60 * 60 * 1000);
+          result.push({
+            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            earnings: 0,
+            tasks: 0,
+          });
+        }
+        return result;
       }
 
-      return data;
+      // Fetch block timestamps for unique blocks
+      const uniqueBlocks = Array.from(new Set(
+        events.map(e => e.blockNumber).filter((n): n is bigint => n !== null && n !== undefined)
+      ));
+      const blockTimestamps = await Promise.all(
+        uniqueBlocks.map(n => client.getBlockTimestamp(n))
+      );
+      const blockTimeMap = new Map<string, number>(
+        uniqueBlocks.map((n, i) => [n.toString(), blockTimestamps[i]])
+      );
+
+      // Group events by UTC date
+      const dateMap = new Map<string, { earnings: number; tasks: number }>();
+      for (const event of events) {
+        const ts = blockTimeMap.get(event.blockNumber?.toString() ?? '');
+        if (ts === undefined) continue;
+        const dateStr = new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const entry = dateMap.get(dateStr) ?? { earnings: 0, tasks: 0 };
+        const amount = event.args?.amount ?? BigInt(0);
+        entry.earnings += parseFloat(formatUnits(amount, 18));
+        entry.tasks += 1;
+        dateMap.set(dateStr, entry);
+      }
+
+      // Build result for last `days` days
+      const result = [];
+      const now = Date.now();
+      for (let i = days; i >= 0; i--) {
+        const date = new Date(now - i * 24 * 60 * 60 * 1000);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const entry = dateMap.get(dateStr) ?? { earnings: 0, tasks: 0 };
+        result.push({
+          date: dateStr,
+          earnings: parseFloat(entry.earnings.toFixed(4)),
+          tasks: entry.tasks,
+        });
+      }
+      return result;
     },
-    enabled: !!address,
+    enabled: !!address && !!client,
     staleTime: REFRESH_INTERVALS.NETWORK_STATS,
+  });
+}
+
+export function useNodeLeaderboard() {
+  const { client } = useOARNClient();
+
+  return useQuery({
+    queryKey: ['nodeLeaderboard'],
+    queryFn: async () => {
+      if (!client) return [];
+      const events = await client.getRewardDistributedEvents();
+      const nodeMap = new Map<string, { total: number; matched: number; earnings: bigint }>();
+
+      for (const log of events) {
+        const node = log.args?.node?.toLowerCase();
+        if (!node) continue;
+        const entry = nodeMap.get(node) ?? { total: 0, matched: 0, earnings: BigInt(0) };
+        entry.total++;
+        if (log.args?.matchedConsensus) entry.matched++;
+        entry.earnings += log.args?.amount ?? BigInt(0);
+        nodeMap.set(node, entry);
+      }
+
+      return Array.from(nodeMap.entries())
+        .map(([address, s]) => ({
+          address,
+          tasksCompleted: s.matched,
+          totalEarnings: s.earnings,
+          successRate: s.total > 0 ? (s.matched / s.total) * 100 : 0,
+        }))
+        .sort((a, b) => b.tasksCompleted - a.tasksCompleted);
+    },
+    enabled: !!client,
+    refetchInterval: REFRESH_INTERVALS.NETWORK_STATS,
+  });
+}
+
+export function useMyCompletedTasks() {
+  const { client, address } = useOARNClient();
+
+  return useQuery({
+    queryKey: ['myCompletedTasks', address],
+    queryFn: async () => {
+      if (!client || !address) return 0;
+      const events = await client.getRewardDistributedEvents(address);
+      return events.filter(log => log.args?.matchedConsensus).length;
+    },
+    enabled: !!client && !!address,
+    refetchInterval: REFRESH_INTERVALS.TASKS,
+  });
+}
+
+export function useMyCrowdfunderStats() {
+  const { client, address } = useOARNClient();
+
+  return useQuery({
+    queryKey: ['myCrowdfunderStats', address],
+    queryFn: async () => {
+      if (!client || !address) {
+        return { tasksFunded: 0, totalContributed: BigInt(0), tasksCompleted: 0 };
+      }
+      const [fundedEvents, tasks] = await Promise.all([
+        client.getTaskFundedEvents(address),
+        client.getTasks(),
+      ]);
+
+      const fundedTaskIds = new Set(
+        fundedEvents.map(l => l.args?.taskId?.toString()).filter(Boolean)
+      );
+      const totalContributed = fundedEvents.reduce(
+        (sum, l) => sum + (l.args?.fundingAmount ?? BigInt(0)),
+        BigInt(0)
+      );
+      const tasksCompleted = tasks.filter(
+        t => fundedTaskIds.has(t.id.toString()) && t.status === TaskStatus.Completed
+      ).length;
+
+      return { tasksFunded: fundedTaskIds.size, totalContributed, tasksCompleted };
+    },
+    enabled: !!client && !!address,
+    refetchInterval: REFRESH_INTERVALS.TASKS,
   });
 }

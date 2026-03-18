@@ -27,4 +27,7 @@ export {
   useNetworkStats,
   useNetworkHistory,
   useEarningsHistory,
+  useNodeLeaderboard,
+  useMyCompletedTasks,
+  useMyCrowdfunderStats,
 } from './useNetworkStats';

@@ -5,9 +5,12 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
 import { Card, Button } from '@/components/ui';
 import { ROLES } from '@/lib/constants';
+import { useNetworkStats } from '@/hooks';
+import { formatEth } from '@/lib/formatters';
 
 export default function HomePage() {
   const { isConnected } = useAccount();
+  const { data: stats } = useNetworkStats();
 
   const roles = Object.values(ROLES);
 
@@ -153,19 +156,21 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 bg-background-light rounded-lg">
               <p className="text-sm text-text-muted">Total Tasks</p>
-              <p className="text-2xl font-bold text-text">156</p>
+              <p className="text-2xl font-bold text-text">{stats?.totalTasks ?? '—'}</p>
             </div>
             <div className="p-4 bg-background-light rounded-lg">
               <p className="text-sm text-text-muted">Active Nodes</p>
-              <p className="text-2xl font-bold text-text">24</p>
+              <p className="text-2xl font-bold text-text">{stats?.activeNodes ?? '—'}</p>
             </div>
             <div className="p-4 bg-background-light rounded-lg">
               <p className="text-sm text-text-muted">Completed Tasks</p>
-              <p className="text-2xl font-bold text-text">117</p>
+              <p className="text-2xl font-bold text-text">{stats?.completedTasks ?? '—'}</p>
             </div>
             <div className="p-4 bg-background-light rounded-lg">
               <p className="text-sm text-text-muted">Total Value Locked</p>
-              <p className="text-2xl font-bold text-text">50 ETH</p>
+              <p className="text-2xl font-bold text-text">
+                {stats ? `${formatEth(stats.tvl)} ETH` : '—'}
+              </p>
             </div>
           </div>
         </Card>

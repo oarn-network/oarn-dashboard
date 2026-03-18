@@ -11,6 +11,7 @@ import {
   useClaimTask,
   useMyBalance,
   useEarningsHistory,
+  useMyCompletedTasks,
 } from '@/hooks';
 import { formatEth } from '@/lib/formatters';
 import type { Task } from '@/providers/OARNClientProvider';
@@ -20,6 +21,7 @@ export default function NodeOperatorDashboard() {
   const { data: activeTasks = [], isLoading: loadingActive } = useActiveTasks();
   const { data: balance, isLoading: loadingBalance } = useMyBalance();
   const { data: earningsHistory = [] } = useEarningsHistory(30);
+  const { data: completedTasks = 0 } = useMyCompletedTasks();
   const { addToast } = useToast();
 
   const claimTaskMutation = useClaimTask();
@@ -69,7 +71,6 @@ export default function NodeOperatorDashboard() {
 
   // Calculate stats
   const totalEarnings = balance?.comp ?? BigInt(0);
-  const completedTasks = 12; // Mock
   const activeTaskCount = activeTasks.length;
 
   return (

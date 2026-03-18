@@ -144,6 +144,9 @@ export const PAGINATION = {
   PAGE_SIZE_OPTIONS: [10, 25, 50, 100],
 } as const;
 
+// Deploy block for TaskRegistryV2 (used as fromBlock in getLogs calls)
+export const TASK_REGISTRY_DEPLOY_BLOCK = BigInt(0); // TODO: set to actual deploy block
+
 // Refresh intervals (in milliseconds)
 export const REFRESH_INTERVALS = {
   TASKS: 30_000, // 30 seconds

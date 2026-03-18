@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
-import { parseAbi } from 'viem';
-import { CONTRACT_ADDRESSES, TaskStatus, ConsensusType, IPFS_CONFIG } from '@/lib/constants';
+import { parseAbi, parseAbiItem } from 'viem';
+import { CONTRACT_ADDRESSES, TaskStatus, ConsensusType, IPFS_CONFIG, TASK_REGISTRY_DEPLOY_BLOCK } from '@/lib/constants';
 
 type PublicClientInstance = NonNullable<ReturnType<typeof usePublicClient>>;
 
@@ -234,6 +234,31 @@ export class OARNClient {
       args: [nodeAddress as `0x${string}`],
     });
     return active as boolean;
+  }
+
+  async getRewardDistributedEvents(nodeAddress?: string) {
+    return this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event RewardDistributed(uint256 indexed taskId, address indexed node, uint256 amount, bool matchedConsensus)'),
+      args: nodeAddress ? { node: nodeAddress as `0x${string}` } : undefined,
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+  }
+
+  async getTaskFundedEvents(funderAddress?: string) {
+    return this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event TaskFunded(uint256 indexed taskId, address indexed funder, uint256 fundingAmount, uint256 newRewardPerNode)'),
+      args: funderAddress ? { funder: funderAddress as `0x${string}` } : undefined,
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+  }
+
+  async getBlockTimestamp(blockNumber: bigint): Promise<number> {
+    const block = await this.pc.getBlock({ blockNumber });
+    return Number(block.timestamp);
   }
 
   getIPFSUrl(cid: string): string {

@@ -3,17 +3,17 @@
 import Link from 'next/link';
 import { StatCard, StatGrid, TaskList, WalletBalances } from '@/components/dashboard';
 import { Button, Card } from '@/components/ui';
-import { usePendingTasks, useMyBalance } from '@/hooks';
+import { usePendingTasks, useMyBalance, useMyCrowdfunderStats } from '@/hooks';
 import { formatEth } from '@/lib/formatters';
 
 export default function CrowdfunderDashboard() {
   const { data: tasks = [], isLoading: loadingTasks } = usePendingTasks();
   const { data: balance, isLoading: loadingBalance } = useMyBalance();
+  const { data: crowdfunderStats } = useMyCrowdfunderStats();
 
-  // Mock stats
-  const tasksFunded = 8;
-  const totalContributed = BigInt('2500000000000000000'); // 2.5 ETH
-  const tasksCompleted = 5;
+  const tasksFunded = crowdfunderStats?.tasksFunded ?? 0;
+  const totalContributed = crowdfunderStats?.totalContributed ?? BigInt(0);
+  const tasksCompleted = crowdfunderStats?.tasksCompleted ?? 0;
 
   return (
     <div className="space-y-8">

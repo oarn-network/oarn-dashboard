@@ -3,13 +3,28 @@
 import { StatCard, StatGrid } from '@/components/dashboard';
 import { LineChart, AreaChart, PieChart } from '@/components/charts';
 import { Card, Badge } from '@/components/ui';
-import { useNetworkStats, useNetworkHistory, useActiveProviders } from '@/hooks';
+import { useNetworkStats, useNetworkHistory, useNodeLeaderboard } from '@/hooks';
 import { formatEth, formatCompactNumber, formatAddress } from '@/lib/formatters';
+import { TaskStatus } from '@/lib/constants';
+import type { Task } from '@/providers/OARNClientProvider';
 
 export default function AnalyticsPage() {
   const { data: stats } = useNetworkStats();
   const { data: history = [] } = useNetworkHistory(30);
-  const { data: providers = [] } = useActiveProviders();
+  const { data: leaderboard = [] } = useNodeLeaderboard();
+
+  // Status distribution from real task data
+  const tasksByStatus: Task[] = stats?.tasks ?? [];
+  const activeCount = tasksByStatus.filter(
+    t => t.status === TaskStatus.Active || t.status === TaskStatus.Consensus
+  ).length;
+  const pendingCount = tasksByStatus.filter(t => t.status === TaskStatus.Pending).length;
+
+  // Completion rate and avg reward from real data
+  const completionRate = stats && stats.totalTasks > 0
+    ? ((stats.completedTasks / stats.totalTasks) * 100).toFixed(1) + '%'
+    : '—';
+  const avgRewardDisplay = stats?.avgReward ? `${formatEth(stats.avgReward)} ETH` : '—';
 
   // Calculate derived stats
   const avgTasksPerDay = history.length > 0
@@ -79,9 +94,9 @@ export default function AnalyticsPage() {
         <PieChart
           title="Task Status Distribution"
           data={[
-            { name: 'Completed', value: stats?.completedTasks ?? 75, color: '#22c55e' },
-            { name: 'Active', value: Math.floor((stats?.totalTasks ?? 100) * 0.15), color: '#22d3ee' },
-            { name: 'Pending', value: Math.floor((stats?.totalTasks ?? 100) * 0.1), color: '#f59e0b' },
+            { name: 'Completed', value: stats?.completedTasks ?? 0, color: '#22c55e' },
+            { name: 'Active', value: activeCount, color: '#22d3ee' },
+            { name: 'Pending', value: pendingCount, color: '#f59e0b' },
           ]}
           height={280}
         />
@@ -123,8 +138,8 @@ export default function AnalyticsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {providers.slice(0, 10).map((provider, index) => (
-                <tr key={provider} className="hover:bg-surface/50">
+              {leaderboard.slice(0, 10).map((node, index) => (
+                <tr key={node.address} className="hover:bg-surface/50">
                   <td className="py-3">
                     <span
                       className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
@@ -138,18 +153,18 @@ export default function AnalyticsPage() {
                   </td>
                   <td className="py-3">
                     <span className="font-mono text-sm text-text">
-                      {formatAddress(provider, 8, 6)}
+                      {formatAddress(node.address, 8, 6)}
                     </span>
                   </td>
                   <td className="py-3 text-sm text-text">
-                    {Math.floor(Math.random() * 100) + 50}
+                    {node.tasksCompleted}
                   </td>
                   <td className="py-3 text-sm text-text">
-                    {(Math.random() * 10 + 5).toFixed(2)} ETH
+                    {formatEth(node.totalEarnings)} ETH
                   </td>
                   <td className="py-3">
                     <span className="text-sm text-success">
-                      {(95 + Math.random() * 5).toFixed(1)}%
+                      {node.successRate.toFixed(1)}%
                     </span>
                   </td>
                   <td className="py-3">
@@ -157,6 +172,13 @@ export default function AnalyticsPage() {
                   </td>
                 </tr>
               ))}
+              {leaderboard.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-sm text-text-muted">
+                    No reward events found on-chain yet
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -166,7 +188,7 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card padding="sm">
           <p className="text-sm text-text-muted">Completion Rate</p>
-          <p className="text-2xl font-bold text-success mt-1">94.2%</p>
+          <p className="text-2xl font-bold text-success mt-1">{completionRate}</p>
         </Card>
         <Card padding="sm">
           <p className="text-sm text-text-muted">Avg. Time to Consensus</p>
@@ -174,7 +196,7 @@ export default function AnalyticsPage() {
         </Card>
         <Card padding="sm">
           <p className="text-sm text-text-muted">Avg. Reward per Task</p>
-          <p className="text-2xl font-bold text-text mt-1">0.15 ETH</p>
+          <p className="text-2xl font-bold text-text mt-1">{avgRewardDisplay}</p>
         </Card>
         <Card padding="sm">
           <p className="text-sm text-text-muted">Network Uptime</p>

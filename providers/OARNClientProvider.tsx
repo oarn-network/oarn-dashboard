@@ -30,6 +30,13 @@ const ERC20_ABI = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
 ]);
 
+const WET_LAB_ORACLE_ABI = parseAbi([
+  'function pendingRewards(address) view returns (uint256)',
+  'function getVerifiedResult(uint256 taskId) view returns (bytes32 agreedHash, uint256 confirmingLabCount, address[] confirmingLabs, uint256 verifiedAt)',
+  'function submitResult(uint256 taskId, bytes32 parametersHash, int256 measuredValue, string metric) nonpayable',
+  'function claimReward() nonpayable',
+]);
+
 // Types
 export interface Task {
   id: number;
@@ -56,6 +63,14 @@ export interface ConsensusStatus {
   resultHash: string;
   submittedCount: number;
   requiredCount: number;
+}
+
+export interface WetLabConsensus {
+  taskId: number;
+  agreedHash: string;
+  confirmingLabCount: number;
+  confirmingLabs: string[];
+  verifiedAt: number;
 }
 
 export interface TaskFilter {
@@ -352,6 +367,62 @@ export class OARNClient {
     });
     // taskId resolved from on-chain event; caller should refresh task list
     return { taskId: 0, tx: { hash } };
+  }
+
+  // ── WetLab Oracle ──
+
+  async getVerifiedWetLabResult(taskId: number): Promise<WetLabConsensus> {
+    const result = await this.pc.readContract({
+      address: CONTRACT_ADDRESSES.WET_LAB_ORACLE as `0x${string}`,
+      abi: WET_LAB_ORACLE_ABI,
+      functionName: 'getVerifiedResult',
+      args: [BigInt(taskId)],
+    });
+    const [agreedHash, confirmingLabCount, confirmingLabs, verifiedAt] =
+      result as unknown as readonly [`0x${string}`, bigint, readonly `0x${string}`[], bigint];
+    return {
+      taskId,
+      agreedHash,
+      confirmingLabCount: Number(confirmingLabCount),
+      confirmingLabs: confirmingLabs as string[],
+      verifiedAt: Number(verifiedAt),
+    };
+  }
+
+  async getWetLabPendingRewards(address: string): Promise<bigint> {
+    const rewards = await this.pc.readContract({
+      address: CONTRACT_ADDRESSES.WET_LAB_ORACLE as `0x${string}`,
+      abi: WET_LAB_ORACLE_ABI,
+      functionName: 'pendingRewards',
+      args: [address as `0x${string}`],
+    });
+    return rewards as bigint;
+  }
+
+  async submitWetLabResult(
+    taskId: number,
+    parametersHash: string,
+    measuredValue: bigint,
+    metric: string
+  ): Promise<{ hash: string }> {
+    this.requireWallet();
+    const hash = await this._writeContractAsync!({
+      address: CONTRACT_ADDRESSES.WET_LAB_ORACLE as `0x${string}`,
+      abi: WET_LAB_ORACLE_ABI,
+      functionName: 'submitResult',
+      args: [BigInt(taskId), parametersHash as `0x${string}`, measuredValue, metric],
+    });
+    return { hash };
+  }
+
+  async claimWetLabReward(): Promise<{ hash: string }> {
+    this.requireWallet();
+    const hash = await this._writeContractAsync!({
+      address: CONTRACT_ADDRESSES.WET_LAB_ORACLE as `0x${string}`,
+      abi: WET_LAB_ORACLE_ABI,
+      functionName: 'claimReward',
+    });
+    return { hash };
   }
 
   // Stubs for methods not supported in browser context

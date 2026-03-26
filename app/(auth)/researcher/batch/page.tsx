@@ -42,7 +42,6 @@ export default function BatchSubmitPage() {
         const batchParams = data.parameterGrid.slice(batchStart, batchEnd);
 
         // Mock batch submission
-        console.log(`Submitting batch ${i + 1}/${batches}:`, batchParams.length, 'tasks');
 
         // Simulate network delay
         await new Promise((resolve) => setTimeout(resolve, 500));

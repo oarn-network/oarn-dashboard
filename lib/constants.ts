@@ -146,7 +146,8 @@ export const PAGINATION = {
 } as const;
 
 // Deploy block for TaskRegistryV2 (used as fromBlock in getLogs calls)
-export const TASK_REGISTRY_DEPLOY_BLOCK = BigInt(0); // TODO: set to actual deploy block
+// Arbitrum Sepolia block ~248250135 corresponds to 2026-03-14T23:02:49 UTC (deployment timestamp)
+export const TASK_REGISTRY_DEPLOY_BLOCK = BigInt(248250135);
 
 // Refresh intervals (in milliseconds)
 export const REFRESH_INTERVALS = {

@@ -4,13 +4,18 @@ import Link from 'next/link';
 import { StatCard, StatGrid, WalletBalances } from '@/components/dashboard';
 import { LineChart, PieChart } from '@/components/charts';
 import { Card, Button } from '@/components/ui';
-import { useNetworkStats, useNetworkHistory, useMyBalance } from '@/hooks';
+import { useNetworkStats, useNetworkHistory, useMyBalance, useTokenMetrics } from '@/hooks';
+import { useGovernanceProposals, type GovernanceProposal } from '@/hooks/useGovernance';
+import { formatUnits } from 'viem';
+import { ProposalState, PROPOSAL_STATE_LABELS } from '@/lib/constants';
 import { formatEth, formatCompactNumber } from '@/lib/formatters';
 
 export default function InvestorDashboard() {
   const { data: stats, isLoading: loadingStats } = useNetworkStats();
   const { data: history = [] } = useNetworkHistory(30);
   const { data: balance, isLoading: loadingBalance } = useMyBalance();
+  const { data: tokenMetrics } = useTokenMetrics();
+  const { data: proposals = [] } = useGovernanceProposals();
 
   return (
     <div className="space-y-8">
@@ -138,23 +143,33 @@ export default function InvestorDashboard() {
             <div className="flex items-center justify-between p-3 bg-background-light rounded-lg">
               <div>
                 <p className="text-sm font-medium text-text">COMP Supply</p>
-                <p className="text-xs text-text-muted">Circulating</p>
+                <p className="text-xs text-text-muted">Total minted</p>
               </div>
-              <p className="text-lg font-bold text-text">1.25M</p>
+              <p className="text-lg font-bold text-text">
+                {tokenMetrics
+                  ? formatCompactNumber(Math.round(Number(formatUnits(tokenMetrics.compSupply, 18))))
+                  : '—'}
+              </p>
             </div>
             <div className="flex items-center justify-between p-3 bg-background-light rounded-lg">
               <div>
-                <p className="text-sm font-medium text-text">COMP Burned</p>
-                <p className="text-xs text-text-muted">All time</p>
+                <p className="text-sm font-medium text-text">GOV Supply</p>
+                <p className="text-xs text-text-muted">Total minted</p>
               </div>
-              <p className="text-lg font-bold text-error">125K</p>
+              <p className="text-lg font-bold text-text">
+                {tokenMetrics
+                  ? formatCompactNumber(Math.round(Number(formatUnits(tokenMetrics.govSupply, 18))))
+                  : '—'}
+              </p>
             </div>
             <div className="flex items-center justify-between p-3 bg-background-light rounded-lg">
               <div>
                 <p className="text-sm font-medium text-text">GOV Holders</p>
                 <p className="text-xs text-text-muted">Unique addresses</p>
               </div>
-              <p className="text-lg font-bold text-text">847</p>
+              <p className="text-lg font-bold text-text">
+                {tokenMetrics ? tokenMetrics.govHolders : '—'}
+              </p>
             </div>
           </div>
         </Card>
@@ -168,28 +183,24 @@ export default function InvestorDashboard() {
             </Link>
           </div>
           <div className="space-y-3">
-            <div className="p-3 bg-background-light rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-text">OIP-12</span>
-                <span className="text-xs text-accent">Active</span>
+            {proposals.filter(p => p.state === ProposalState.Active).slice(0, 3).map((p: GovernanceProposal) => (
+              <div key={p.id} className="p-3 bg-background-light rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-text truncate pr-2">{p.title || `Proposal #${p.id.slice(0, 6)}`}</span>
+                  <span className="text-xs text-accent shrink-0">{PROPOSAL_STATE_LABELS[p.state]}</span>
+                </div>
+                {p.description && (
+                  <p className="text-xs text-text-muted line-clamp-1">{p.description}</p>
+                )}
+                <div className="mt-2 h-1.5 bg-surface rounded-full overflow-hidden">
+                  <div className="h-full bg-success" style={{ width: `${p.forPercent}%` }} />
+                </div>
+                <p className="text-xs text-text-muted mt-1">{p.forPercent}% in favor</p>
               </div>
-              <p className="text-xs text-text-muted">Increase node reward rate by 10%</p>
-              <div className="mt-2 h-1.5 bg-surface rounded-full overflow-hidden">
-                <div className="h-full bg-success" style={{ width: '72%' }} />
-              </div>
-              <p className="text-xs text-text-muted mt-1">72% in favor</p>
-            </div>
-            <div className="p-3 bg-background-light rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-text">OIP-11</span>
-                <span className="text-xs text-accent">Active</span>
-              </div>
-              <p className="text-xs text-text-muted">Add PyTorch 2.0 support</p>
-              <div className="mt-2 h-1.5 bg-surface rounded-full overflow-hidden">
-                <div className="h-full bg-success" style={{ width: '89%' }} />
-              </div>
-              <p className="text-xs text-text-muted mt-1">89% in favor</p>
-            </div>
+            ))}
+            {proposals.filter(p => p.state === ProposalState.Active).length === 0 && (
+              <p className="text-sm text-text-muted text-center py-4">No active proposals</p>
+            )}
           </div>
         </Card>
       </div>

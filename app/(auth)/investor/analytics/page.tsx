@@ -3,7 +3,7 @@
 import { StatCard, StatGrid } from '@/components/dashboard';
 import { LineChart, AreaChart, PieChart } from '@/components/charts';
 import { Card, Badge } from '@/components/ui';
-import { useNetworkStats, useNetworkHistory, useNodeLeaderboard } from '@/hooks';
+import { useNetworkStats, useNetworkHistory, useNodeLeaderboard, useModelFrameworks } from '@/hooks';
 import { formatEth, formatCompactNumber, formatAddress } from '@/lib/formatters';
 import { TaskStatus } from '@/lib/constants';
 import type { Task } from '@/providers/OARNClientProvider';
@@ -12,6 +12,7 @@ export default function AnalyticsPage() {
   const { data: stats } = useNetworkStats();
   const { data: history = [] } = useNetworkHistory(30);
   const { data: leaderboard = [] } = useNodeLeaderboard();
+  const { data: frameworkCounts = {} } = useModelFrameworks();
 
   // Status distribution from real task data
   const tasksByStatus: Task[] = stats?.tasks ?? [];
@@ -103,11 +104,14 @@ export default function AnalyticsPage() {
 
         <PieChart
           title="Model Frameworks"
-          data={[
-            { name: 'ONNX', value: 45, color: '#6366f1' },
-            { name: 'PyTorch', value: 35, color: '#ef4444' },
-            { name: 'TensorFlow', value: 20, color: '#f59e0b' },
-          ]}
+          data={Object.entries(frameworkCounts).length > 0
+            ? Object.entries(frameworkCounts).map(([name, value], i) => ({
+                name,
+                value,
+                color: ['#6366f1', '#ef4444', '#f59e0b', '#22d3ee', '#a855f7'][i % 5],
+              }))
+            : [{ name: 'No tasks yet', value: 1, color: '#374151' }]
+          }
           height={280}
         />
 
@@ -185,22 +189,20 @@ export default function AnalyticsPage() {
       </Card>
 
       {/* Additional Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card padding="sm">
           <p className="text-sm text-text-muted">Completion Rate</p>
           <p className="text-2xl font-bold text-success mt-1">{completionRate}</p>
         </Card>
         <Card padding="sm">
           <p className="text-sm text-text-muted">Avg. Time to Consensus</p>
-          <p className="text-2xl font-bold text-text mt-1">12.5 min</p>
+          <p className="text-2xl font-bold text-text mt-1">
+            {stats?.avgConsensusTimeMin != null ? `${stats.avgConsensusTimeMin} min` : '—'}
+          </p>
         </Card>
         <Card padding="sm">
           <p className="text-sm text-text-muted">Avg. Reward per Task</p>
           <p className="text-2xl font-bold text-text mt-1">{avgRewardDisplay}</p>
-        </Card>
-        <Card padding="sm">
-          <p className="text-sm text-text-muted">Network Uptime</p>
-          <p className="text-2xl font-bold text-success mt-1">99.9%</p>
         </Card>
       </div>
     </div>

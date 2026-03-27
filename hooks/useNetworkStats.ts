@@ -47,14 +47,101 @@ export function useNetworkStats() {
         .filter(t => t.status !== TaskStatus.Cancelled && t.status !== TaskStatus.Expired)
         .reduce((sum, t) => sum + t.rewardPerNode * BigInt(t.requiredNodes), BigInt(0));
 
+      // Avg time from first TaskClaimed to ConsensusReached per task (in minutes)
+      let avgConsensusTimeMin: number | null = null;
+      try {
+        const [claimedLogs, consensusLogs] = await Promise.all([
+          client.getTaskClaimedEvents(),
+          client.getConsensusReachedEvents(),
+        ]);
+
+        if (consensusLogs.length > 0) {
+          // First claim block per taskId
+          const firstClaimBlock = new Map<string, bigint>();
+          for (const log of claimedLogs) {
+            const id = log.args?.taskId?.toString() ?? '';
+            if (!id || log.blockNumber === null) continue;
+            const cur = firstClaimBlock.get(id);
+            if (cur === undefined || log.blockNumber < cur) {
+              firstClaimBlock.set(id, log.blockNumber);
+            }
+          }
+
+          // Pair with ConsensusReached events
+          const deltas: number[] = [];
+          const uniqueBlocks = new Set<bigint>();
+          for (const log of consensusLogs) {
+            const id = log.args?.taskId?.toString() ?? '';
+            const claimBlock = firstClaimBlock.get(id);
+            if (!claimBlock || log.blockNumber === null) continue;
+            uniqueBlocks.add(claimBlock);
+            uniqueBlocks.add(log.blockNumber);
+          }
+
+          const blockTsMap = new Map<string, number>();
+          await Promise.all(Array.from(uniqueBlocks).map(async (bn) => {
+            const ts = await client.getBlockTimestamp(bn);
+            blockTsMap.set(bn.toString(), ts);
+          }));
+
+          for (const log of consensusLogs) {
+            const id = log.args?.taskId?.toString() ?? '';
+            const claimBlock = firstClaimBlock.get(id);
+            if (!claimBlock || log.blockNumber === null) continue;
+            const claimTs = blockTsMap.get(claimBlock.toString());
+            const consensusTs = blockTsMap.get(log.blockNumber.toString());
+            if (claimTs !== undefined && consensusTs !== undefined && consensusTs > claimTs) {
+              deltas.push((consensusTs - claimTs) / 60);
+            }
+          }
+
+          if (deltas.length > 0) {
+            avgConsensusTimeMin = parseFloat(
+              (deltas.reduce((a, b) => a + b, 0) / deltas.length).toFixed(1)
+            );
+          }
+        }
+      } catch {
+        // Non-critical — leave as null
+      }
+
       return {
         totalTasks: tasks.length,
         activeNodes: providers.length,
         completedTasks,
         tvl,
         avgReward,
+        avgConsensusTimeMin,
         tasks,
       };
+    },
+    enabled: !!client,
+    refetchInterval: REFRESH_INTERVALS.NETWORK_STATS,
+  });
+}
+
+export function useModelFrameworks() {
+  const { client } = useOARNClient();
+
+  return useQuery({
+    queryKey: ['modelFrameworks'],
+    queryFn: async () => {
+      if (!client) return {};
+      return client.getModelFrameworks();
+    },
+    enabled: !!client,
+    staleTime: REFRESH_INTERVALS.NETWORK_STATS,
+  });
+}
+
+export function useTokenMetrics() {
+  const { client } = useOARNClient();
+
+  return useQuery({
+    queryKey: ['tokenMetrics'],
+    queryFn: async () => {
+      if (!client) return { compSupply: BigInt(0), govSupply: BigInt(0), govHolders: 0 };
+      return client.getTokenMetrics();
     },
     enabled: !!client,
     refetchInterval: REFRESH_INTERVALS.NETWORK_STATS,

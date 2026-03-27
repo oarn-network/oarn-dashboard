@@ -129,7 +129,7 @@ export default function NodeOperatorDashboard() {
         />
         <StatCard
           title="Uptime"
-          value="99.2%"
+          value="N/A"
           icon={
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

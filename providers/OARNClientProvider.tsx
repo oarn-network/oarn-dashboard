@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
-import { parseAbi, parseAbiItem } from 'viem';
+import { parseAbi, parseAbiItem, decodeFunctionData } from 'viem';
 import { CONTRACT_ADDRESSES, TaskStatus, ConsensusType, IPFS_CONFIG, TASK_REGISTRY_DEPLOY_BLOCK } from '@/lib/constants';
 
 type PublicClientInstance = NonNullable<ReturnType<typeof usePublicClient>>;
@@ -28,6 +28,11 @@ const OARN_REGISTRY_ABI = parseAbi([
 
 const ERC20_ABI = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
+  'function totalSupply() view returns (uint256)',
+]);
+
+const SUBMIT_TASK_ABI = parseAbi([
+  'function submitTask(bytes32 modelHash, bytes32 inputHash, string modelRequirements, uint256 rewardPerNode, uint256 requiredNodes, uint256 deadline, uint8 consensusType) payable returns (uint256)',
 ]);
 
 const WET_LAB_ORACLE_ABI = parseAbi([
@@ -274,6 +279,86 @@ export class OARNClient {
   async getBlockTimestamp(blockNumber: bigint): Promise<number> {
     const block = await this.pc.getBlock({ blockNumber });
     return Number(block.timestamp);
+  }
+
+  async getTaskClaimedEvents(taskId?: number) {
+    return this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
+      args: taskId !== undefined ? { taskId: BigInt(taskId) } : undefined,
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+  }
+
+  async getConsensusReachedEvents() {
+    return this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event ConsensusReached(uint256 indexed taskId, bytes32 consensusHash, uint256 agreeingNodes, uint256 totalNodes)'),
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+  }
+
+  /** Parse modelRequirements JSON from submitTask calldata and tally by framework. */
+  async getModelFrameworks(): Promise<Record<string, number>> {
+    const logs = await this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event TaskCreated(uint256 indexed taskId, address indexed requester, bytes32 modelHash, uint256 rewardPerNode, uint256 requiredNodes, uint8 consensusType)'),
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+
+    const counts: Record<string, number> = {};
+    await Promise.all(logs.map(async (log) => {
+      try {
+        if (!log.transactionHash) return;
+        const tx = await this.pc.getTransaction({ hash: log.transactionHash });
+        const { args } = decodeFunctionData({ abi: SUBMIT_TASK_ABI, data: tx.input });
+        const modelReq = args[2] as string; // modelRequirements string
+        const parsed = JSON.parse(modelReq) as { framework?: string };
+        const fw = (parsed.framework ?? 'Unknown').trim();
+        const key = fw.charAt(0).toUpperCase() + fw.slice(1).toLowerCase();
+        counts[key] = (counts[key] ?? 0) + 1;
+      } catch {
+        counts['Unknown'] = (counts['Unknown'] ?? 0) + 1;
+      }
+    }));
+
+    return counts;
+  }
+
+  /** Read COMP/GOV token supply and estimate GOV holder count from Transfer events. */
+  async getTokenMetrics(): Promise<{ compSupply: bigint; govSupply: bigint; govHolders: number }> {
+    const [compSupply, govSupply, govTransfers] = await Promise.all([
+      this.pc.readContract({
+        address: CONTRACT_ADDRESSES.COMP_TOKEN as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'totalSupply',
+      }) as Promise<bigint>,
+      this.pc.readContract({
+        address: CONTRACT_ADDRESSES.GOV_TOKEN as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'totalSupply',
+      }) as Promise<bigint>,
+      this.pc.getLogs({
+        address: CONTRACT_ADDRESSES.GOV_TOKEN as `0x${string}`,
+        event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)'),
+        fromBlock: BigInt(0),
+        toBlock: 'latest',
+      }),
+    ]);
+
+    // Count unique non-zero recipients of GOV transfers as proxy for holder count
+    const holders = new Set<string>();
+    for (const log of govTransfers) {
+      const to = log.args?.to;
+      if (to && to !== '0x0000000000000000000000000000000000000000') {
+        holders.add(to.toLowerCase());
+      }
+    }
+
+    return { compSupply, govSupply, govHolders: holders.size };
   }
 
   getIPFSUrl(cid: string): string {

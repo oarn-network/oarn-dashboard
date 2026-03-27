@@ -30,4 +30,6 @@ export {
   useNodeLeaderboard,
   useMyCompletedTasks,
   useMyCrowdfunderStats,
+  useModelFrameworks,
+  useTokenMetrics,
 } from './useNetworkStats';

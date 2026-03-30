@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { StatCard, StatGrid, TaskList, WalletBalances } from '@/components/dashboard';
+import { StatCard, StatGrid, TaskList, WalletBalances, ReputationCard } from '@/components/dashboard';
 import { AreaChart } from '@/components/charts';
 import { Modal, useToast } from '@/components/ui';
 import { SubmitResultForm } from '@/components/forms';
@@ -12,6 +12,7 @@ import {
   useMyBalance,
   useEarningsHistory,
   useMyCompletedTasks,
+  useNodeReputation,
 } from '@/hooks';
 import { formatEth } from '@/lib/formatters';
 import type { Task } from '@/providers/OARNClientProvider';
@@ -22,6 +23,7 @@ export default function NodeOperatorDashboard() {
   const { data: balance, isLoading: loadingBalance } = useMyBalance();
   const { data: earningsHistory = [] } = useEarningsHistory(30);
   const { data: completedTasks = 0 } = useMyCompletedTasks();
+  const { data: reputation, isLoading: loadingReputation } = useNodeReputation();
   const { addToast } = useToast();
 
   const claimTaskMutation = useClaimTask();
@@ -128,8 +130,9 @@ export default function NodeOperatorDashboard() {
           trend={{ value: 8, isPositive: true }}
         />
         <StatCard
-          title="Uptime"
-          value="N/A"
+          title="Reputation Score"
+          value={reputation ? `${reputation.reputationScore} / 100` : '—'}
+          subtitle={reputation?.tier ?? undefined}
           icon={
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -172,8 +175,9 @@ export default function NodeOperatorDashboard() {
           </div>
         </div>
 
-        {/* Right Column - Earnings & Balance */}
+        {/* Right Column - Reputation, Earnings & Balance */}
         <div className="space-y-8">
+          <ReputationCard data={reputation} isLoading={loadingReputation} />
           <WalletBalances balance={balance ?? null} isLoading={loadingBalance} />
 
           <AreaChart

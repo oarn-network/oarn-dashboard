@@ -296,6 +296,65 @@ export function useNodeLeaderboard() {
   });
 }
 
+export function useNodeReputation(nodeAddress?: string | null) {
+  const { client, address: connectedAddress } = useOARNClient();
+  const addr = nodeAddress ?? connectedAddress;
+
+  return useQuery({
+    queryKey: ['nodeReputation', addr],
+    queryFn: async () => {
+      if (!client || !addr) return null;
+
+      const [rewardEvents, claimedEvents, submittedEvents] = await Promise.all([
+        client.getRewardDistributedEvents(addr),
+        client.getTaskClaimedEvents(),
+        client.getResultSubmittedEvents(addr),
+      ]);
+
+      // Filter claimed events to this node
+      const claimed = claimedEvents.filter(
+        (e) => e.args?.node?.toLowerCase() === addr.toLowerCase()
+      );
+
+      const tasksClaimed = claimed.length;
+      const tasksSubmitted = submittedEvents.length;
+      const totalSubmissions = rewardEvents.length;
+      const consensusMatches = rewardEvents.filter((e) => e.args?.matchedConsensus).length;
+      const totalEarned = rewardEvents.reduce(
+        (sum, e) => sum + (e.args?.amount ?? BigInt(0)),
+        BigInt(0)
+      );
+
+      const consensusMatchRate = totalSubmissions > 0 ? consensusMatches / totalSubmissions : 0;
+      const submissionRate = tasksClaimed > 0 ? Math.min(tasksSubmitted / tasksClaimed, 1) : 0;
+      // Volume component: scales linearly to 1 at 50 completed tasks
+      const volumeScore = Math.min(consensusMatches / 50, 1);
+
+      const reputationScore = Math.round(
+        (0.4 * consensusMatchRate + 0.3 * submissionRate + 0.3 * volumeScore) * 100
+      );
+
+      const tier =
+        reputationScore >= 90 ? 'Platinum' :
+        reputationScore >= 70 ? 'Gold' :
+        reputationScore >= 45 ? 'Silver' :
+        reputationScore >= 20 ? 'Bronze' : 'New';
+
+      return {
+        reputationScore,
+        tier,
+        consensusMatchRate: Math.round(consensusMatchRate * 100),
+        submissionRate: Math.round(submissionRate * 100),
+        tasksCompleted: consensusMatches,
+        tasksClaimed,
+        totalEarned,
+      };
+    },
+    enabled: !!client && !!addr,
+    refetchInterval: REFRESH_INTERVALS.TASKS,
+  });
+}
+
 export function useMyCompletedTasks() {
   const { client, address } = useOARNClient();
 

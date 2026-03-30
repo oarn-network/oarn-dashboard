@@ -28,6 +28,7 @@ export {
   useNetworkHistory,
   useEarningsHistory,
   useNodeLeaderboard,
+  useNodeReputation,
   useMyCompletedTasks,
   useMyCrowdfunderStats,
   useModelFrameworks,

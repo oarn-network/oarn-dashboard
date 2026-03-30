@@ -217,6 +217,19 @@ export class OARNClient {
     return nodes as string[];
   }
 
+  async getTasksByNode(nodeAddress: string): Promise<Task[]> {
+    const events = await this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
+      args: { node: nodeAddress as `0x${string}` },
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+    const taskIds = Array.from(new Set(events.map((e) => Number(e.args?.taskId ?? 0)).filter(Boolean)));
+    const tasks = await Promise.all(taskIds.map((id) => this.getTask(id)));
+    return tasks.filter((t): t is Task => t !== null);
+  }
+
   async getBalance(address: string): Promise<Balance> {
     const addr = address as `0x${string}`;
     const [eth, comp, gov] = await Promise.all([
@@ -286,6 +299,16 @@ export class OARNClient {
       address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
       event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
       args: taskId !== undefined ? { taskId: BigInt(taskId) } : undefined,
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+  }
+
+  async getResultSubmittedEvents(nodeAddress?: string) {
+    return this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event ResultSubmitted(uint256 indexed taskId, address indexed node, bytes32 resultHash)'),
+      args: nodeAddress ? { node: nodeAddress as `0x${string}` } : undefined,
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
       toBlock: 'latest',
     });

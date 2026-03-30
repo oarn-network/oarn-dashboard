@@ -71,9 +71,8 @@ export function useMyTasks(role: 'requester' | 'node') {
         return client.getTasks({ requester: address });
       }
 
-      // For node operators, we'd need to check claimed tasks
-      // For now, return all active tasks as a placeholder
-      return client.getTasks({ status: TaskStatus.Active });
+      // Node operators: fetch tasks this wallet has claimed via event history
+      return client.getTasksByNode(address);
     },
     enabled: !!client && !!address,
     refetchInterval: REFRESH_INTERVALS.TASKS,

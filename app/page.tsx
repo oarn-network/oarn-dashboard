@@ -193,13 +193,17 @@ export default function HomePage() {
                 Arbiscan
               </a>
               <a
-                href="#"
+                href="https://github.com/oarn-network/oarn-docs"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-sm text-text-muted hover:text-text"
               >
                 Docs
               </a>
               <a
-                href="#"
+                href="https://github.com/oarn-network"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-sm text-text-muted hover:text-text"
               >
                 GitHub

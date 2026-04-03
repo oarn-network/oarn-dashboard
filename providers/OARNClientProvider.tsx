@@ -441,15 +441,8 @@ export class OARNClient {
     return { hash };
   }
 
-  async cancelTask(taskId: number): Promise<{ hash: string }> {
-    this.requireWallet();
-    const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
-      abi: TASK_REGISTRY_ABI,
-      functionName: 'cancelTask',
-      args: [BigInt(taskId)],
-    });
-    return { hash };
+  async cancelTask(_taskId: number): Promise<{ hash: string }> {
+    throw new Error('Task cancellation is not supported by the contract');
   }
 
   async fundTask(taskId: number, amount: bigint): Promise<{ hash: string }> {

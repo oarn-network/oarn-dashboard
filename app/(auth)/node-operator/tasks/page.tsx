@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { TaskList } from '@/components/dashboard';
 import { Modal, useToast } from '@/components/ui';
 import { SubmitResultForm } from '@/components/forms';
-import { useActiveTasks } from '@/hooks';
+import { useMyTasks } from '@/hooks';
 import type { Task } from '@/providers/OARNClientProvider';
 
 export default function NodeOperatorTasksPage() {
-  const { data: tasks = [], isLoading } = useActiveTasks();
+  // Fetch all tasks this wallet has ever claimed (including completed), via event history
+  const { data: tasks = [], isLoading } = useMyTasks('node');
   const { addToast } = useToast();
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -36,15 +37,15 @@ export default function NodeOperatorTasksPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-text">My Claimed Tasks</h1>
-        <p className="text-text-muted mt-1">View and manage tasks you have claimed</p>
+        <h1 className="text-2xl font-bold text-text">My Tasks</h1>
+        <p className="text-text-muted mt-1">All tasks claimed by this wallet — pending, active, and completed</p>
       </div>
 
       {/* Task List */}
       <TaskList
         tasks={tasks}
         isLoading={isLoading}
-        emptyMessage="You have no claimed tasks"
+        emptyMessage="No tasks claimed by this wallet yet"
         onSubmitResult={handleSubmitResult}
       />
 

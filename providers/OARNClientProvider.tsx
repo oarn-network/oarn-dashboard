@@ -7,20 +7,25 @@ import { CONTRACT_ADDRESSES, TaskStatus, ConsensusType, IPFS_CONFIG, TASK_REGIST
 
 type PublicClientInstance = NonNullable<ReturnType<typeof usePublicClient>>;
 
-// ABIs (human-readable format, matching TaskRegistryV2)
+// ABIs (human-readable format, matching deployed TaskRegistryV2)
 const TASK_REGISTRY_ABI = parseAbi([
-  'function tasks(uint256 taskId) view returns (address requester, bytes32 modelHash, bytes32 inputHash, uint256 rewardPerNode, uint256 requiredNodes, uint256 deadline, uint8 status, uint8 consensusType)',
+  // Full struct: id, requester, modelHash, inputHash, modelRequirements (string=dynamic),
+  // rewardPerNode, requiredNodes, claimedCount, submittedCount, deadline,
+  // status, consensusType, createdAt, consensusResult
+  'function tasks(uint256 taskId) view returns (uint256 id, address requester, bytes32 modelHash, bytes32 inputHash, string modelRequirements, uint256 rewardPerNode, uint256 requiredNodes, uint256 claimedCount, uint256 submittedCount, uint256 deadline, uint8 status, uint8 consensusType, uint256 createdAt, bytes32 consensusResult)',
   'function taskCount() view returns (uint256)',
-  'function getConsensusStatus(uint256 taskId) view returns (uint256 totalSubmissions, uint256 uniqueResults, bytes32 leadingResultHash, uint256 leadingCount, bool consensusReached, uint256 requiredForConsensus)',
-  'function getTaskNodes(uint256 taskId) view returns (address[])',
-  'function getNodeResult(uint256 taskId, address node) view returns (bytes32)',
+  // Actual contract: winningHash, winningCount, totalSubmissions, reached, uniqueResults
+  'function getConsensusStatus(uint256 taskId) view returns (bytes32 winningHash, uint256 winningCount, uint256 totalSubmissions, bool reached, uint256 uniqueResults)',
+  'function hasClaimedTask(uint256 taskId, address node) view returns (bool)',
+  'function hasSubmittedResult(uint256 taskId, address node) view returns (bool)',
   'function submitTask(bytes32 modelHash, bytes32 inputHash, string modelRequirements, uint256 rewardPerNode, uint256 requiredNodes, uint256 deadline, uint8 consensusType) payable returns (uint256)',
   'function claimTask(uint256 taskId)',
   'function submitResult(uint256 taskId, bytes32 resultHash)',
-  'function cancelTask(uint256 taskId)',
   'function fundTask(uint256 taskId) payable',
 ]);
 
+// OARNRegistry ABI kept for reference but not currently used for reads
+// (active node list is derived from on-chain events instead)
 const OARN_REGISTRY_ABI = parseAbi([
   'function getActiveRPCProviders() view returns (address[])',
   'function isNodeActive(address node) view returns (bool)',
@@ -136,9 +141,11 @@ export class OARNClient {
         args: [BigInt(taskId)],
       });
 
-      // viem returns a readonly tuple for multi-output functions
-      const [requester, modelHash, inputHash, rewardPerNode, requiredNodes, deadline, status, consensusType] =
-        result as unknown as readonly [`0x${string}`, `0x${string}`, `0x${string}`, bigint, bigint, bigint, number, number];
+      // Full struct (14 fields): id, requester, modelHash, inputHash, modelRequirements,
+      // rewardPerNode, requiredNodes, claimedCount, submittedCount, deadline,
+      // status, consensusType, createdAt, consensusResult
+      const [id, requester, modelHash, inputHash, , rewardPerNode, requiredNodes, , , deadline, status, consensusType] =
+        result as unknown as readonly [bigint, `0x${string}`, `0x${string}`, `0x${string}`, string, bigint, bigint, bigint, bigint, bigint, number, number, bigint, `0x${string}`];
 
       // Skip zero-address tasks (non-existent)
       if (requester === '0x0000000000000000000000000000000000000000') {
@@ -146,7 +153,7 @@ export class OARNClient {
       }
 
       return {
-        id: taskId,
+        id: Number(id),
         requester,
         modelHash,
         inputHash,
@@ -196,25 +203,28 @@ export class OARNClient {
       args: [BigInt(taskId)],
     });
 
-    const [totalSubmissions, , leadingResultHash, , consensusReached, requiredForConsensus] =
-      result as unknown as readonly [bigint, bigint, `0x${string}`, bigint, boolean, bigint];
+    // Actual order: winningHash, winningCount, totalSubmissions, reached, uniqueResults
+    const [winningHash, winningCount, totalSubmissions, reached] =
+      result as unknown as readonly [`0x${string}`, bigint, bigint, boolean, bigint];
 
     return {
-      reached: consensusReached,
-      resultHash: leadingResultHash,
+      reached,
+      resultHash: winningHash,
       submittedCount: Number(totalSubmissions),
-      requiredCount: Number(requiredForConsensus),
+      requiredCount: Number(winningCount),
     };
   }
 
   async getTaskNodes(taskId: number): Promise<string[]> {
-    const nodes = await this.pc.readContract({
+    // Derive node addresses from TaskClaimed events for this task
+    const events = await this.pc.getLogs({
       address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
-      abi: TASK_REGISTRY_ABI,
-      functionName: 'getTaskNodes',
-      args: [BigInt(taskId)],
+      event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
+      args: { taskId: BigInt(taskId) },
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
     });
-    return nodes as string[];
+    return Array.from(new Set(events.map((e) => e.args?.node as string).filter(Boolean)));
   }
 
   async getTasksByNode(nodeAddress: string): Promise<Task[]> {
@@ -251,12 +261,19 @@ export class OARNClient {
   }
 
   async getActiveProviders(): Promise<string[]> {
-    const providers = await this.pc.readContract({
-      address: CONTRACT_ADDRESSES.OARN_REGISTRY as `0x${string}`,
-      abi: OARN_REGISTRY_ABI,
-      functionName: 'getActiveRPCProviders',
+    // Derive unique node addresses from RewardDistributed events (nodes that have done real work)
+    const events = await this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event RewardDistributed(uint256 indexed taskId, address indexed node, uint256 amount, bool matchedConsensus)'),
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
     });
-    return providers as string[];
+    const unique = new Set<string>();
+    for (const e of events) {
+      const node = e.args?.node;
+      if (node) unique.add(node.toLowerCase());
+    }
+    return Array.from(unique);
   }
 
   async isNodeActive(nodeAddress: string): Promise<boolean> {

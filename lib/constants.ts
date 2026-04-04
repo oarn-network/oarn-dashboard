@@ -29,10 +29,12 @@ export const ARBITRUM_SEPOLIA = {
 } as const;
 
 // IPFS configuration
+// NEXT_PUBLIC_IPFS_GATEWAY — set in Vercel env vars to switch to self-hosted gateway
+// e.g. https://ipfs.oarn.network/ipfs/ (once domain + SSL are live, task #107.16)
 export const IPFS_CONFIG = {
-  gateway: 'https://ipfs.io/ipfs/',
+  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/',
   apiUrl: 'http://127.0.0.1:5001/api/v0',
-} as const;
+};
 
 // Task statuses — values match on-chain TaskRegistryV2 enum
 export enum TaskStatus {

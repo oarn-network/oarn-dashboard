@@ -30,16 +30,24 @@ export default function SubmitTaskPage() {
       // 2. Call client.submitTaskWithData()
 
       const deadlineTimestamp = Math.floor(Date.now() / 1000) + data.deadlineHours * 3600;
+      const rewardPerNode = BigInt(Math.floor(parseFloat(data.rewardPerNode) * 1e18));
 
-      // Mock submission
-      const result = await client.submitTask({
-        modelHash: '0x' + '0'.repeat(64), // Placeholder
+      const baseOptions = {
+        modelHash: '0x' + '0'.repeat(64), // Placeholder — real impl uploads to IPFS first
         inputHash: '0x' + '0'.repeat(64), // Placeholder
-        rewardPerNode: BigInt(Math.floor(parseFloat(data.rewardPerNode) * 1e18)),
+        rewardPerNode,
         requiredNodes: data.requiredNodes,
         deadline: deadlineTimestamp,
         consensusType: data.consensusType,
-      });
+      };
+
+      const result = data.continuous
+        ? await client.submitContinuousTask({
+            ...baseOptions,
+            maxRounds: data.maxRounds,
+            maxSpendWei: BigInt(Math.floor(parseFloat(data.maxSpendEth) * 1e18)),
+          })
+        : await client.submitTask(baseOptions);
 
       addToast({
         type: 'success',

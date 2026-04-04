@@ -22,6 +22,12 @@ const TASK_REGISTRY_ABI = parseAbi([
   'function claimTask(uint256 taskId)',
   'function submitResult(uint256 taskId, bytes32 resultHash)',
   'function fundTask(uint256 taskId) payable',
+  'function submitTaskContinuous(bytes32 modelHash, bytes32 inputHash, string modelRequirements, uint256 rewardPerNode, uint256 requiredNodes, uint256 deadline, uint8 consensusType, uint256 maxRounds, uint256 maxSpendWei) payable returns (uint256)',
+  'function triggerNextRound(uint256 parentTaskId) payable returns (uint256)',
+  'function stopContinuousTask(uint256 parentTaskId)',
+  'function getTaskMode(uint256 taskId) view returns (uint8)',
+  'function continuousParent(uint256 taskId) view returns (uint256)',
+  'function getContinuousInfo(uint256 taskId) view returns (uint256 maxRounds, uint256 roundsTriggered, uint256 maxSpendWei, uint256 totalSpent, bool active, uint256[] roundTaskIds)',
 ]);
 
 // OARNRegistry — used only for isNodeActive check.
@@ -91,6 +97,18 @@ export interface Task {
   consensusType: ConsensusType;
   resultHash?: string;
   name?: string;   // resolved from modelRequirements calldata
+  // continuous task fields
+  mode?: 'OneShot' | 'Continuous';
+  parentTaskId?: number;
+}
+
+export interface ContinuousTaskInfo {
+  maxRounds: number;
+  roundsTriggered: number;
+  maxSpendWei: bigint;
+  totalSpent: bigint;
+  active: boolean;
+  roundTaskIds: number[];
 }
 
 export interface Balance {
@@ -128,6 +146,11 @@ export interface SubmitTaskOptions {
   requiredNodes: number;
   deadline: number;
   consensusType?: ConsensusType;
+}
+
+export interface SubmitContinuousTaskOptions extends SubmitTaskOptions {
+  maxRounds: number;
+  maxSpendWei: bigint;
 }
 
 type WriteContractAsync = ReturnType<typeof useWriteContract>['writeContractAsync'];
@@ -541,6 +564,86 @@ export class OARNClient {
     });
     // taskId resolved from on-chain event; caller should refresh task list
     return { taskId: 0, tx: { hash } };
+  }
+
+  async getContinuousInfo(parentTaskId: number): Promise<ContinuousTaskInfo | null> {
+    try {
+      const result = await this.pc.readContract({
+        address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+        abi: TASK_REGISTRY_ABI,
+        functionName: 'getContinuousInfo',
+        args: [BigInt(parentTaskId)],
+      });
+      const [maxRounds, roundsTriggered, maxSpendWei, totalSpent, active, roundTaskIds] =
+        result as unknown as readonly [bigint, bigint, bigint, bigint, boolean, readonly bigint[]];
+      if (!active && Number(maxRounds) === 0) return null;
+      return {
+        maxRounds: Number(maxRounds),
+        roundsTriggered: Number(roundsTriggered),
+        maxSpendWei,
+        totalSpent,
+        active,
+        roundTaskIds: (roundTaskIds as readonly bigint[]).map(Number),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async submitContinuousTask(options: SubmitContinuousTaskOptions): Promise<{ taskId: number; tx: { hash: string } }> {
+    this.requireWallet();
+    const {
+      modelHash,
+      inputHash,
+      rewardPerNode,
+      requiredNodes,
+      deadline,
+      consensusType = ConsensusType.Majority,
+      maxRounds,
+      maxSpendWei,
+    } = options;
+    const roundCost = rewardPerNode * BigInt(requiredNodes);
+    const hash = await this._writeContractAsync!({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      abi: TASK_REGISTRY_ABI,
+      functionName: 'submitTaskContinuous',
+      args: [
+        modelHash as `0x${string}`,
+        inputHash as `0x${string}`,
+        '',
+        rewardPerNode,
+        BigInt(requiredNodes),
+        BigInt(deadline),
+        consensusType,
+        BigInt(maxRounds),
+        maxSpendWei,
+      ],
+      value: roundCost,
+    });
+    return { taskId: 0, tx: { hash } };
+  }
+
+  async triggerNextRound(parentTaskId: number, roundCost: bigint): Promise<{ hash: string }> {
+    this.requireWallet();
+    const hash = await this._writeContractAsync!({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      abi: TASK_REGISTRY_ABI,
+      functionName: 'triggerNextRound',
+      args: [BigInt(parentTaskId)],
+      value: roundCost,
+    });
+    return { hash };
+  }
+
+  async stopContinuousTask(parentTaskId: number): Promise<{ hash: string }> {
+    this.requireWallet();
+    const hash = await this._writeContractAsync!({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      abi: TASK_REGISTRY_ABI,
+      functionName: 'stopContinuousTask',
+      args: [BigInt(parentTaskId)],
+    });
+    return { hash };
   }
 
   // ── WetLab Oracle ──

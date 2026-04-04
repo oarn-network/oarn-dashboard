@@ -17,6 +17,9 @@ export interface TaskFormData {
   requiredNodes: number;
   deadlineHours: number;
   consensusType: ConsensusType;
+  continuous: boolean;
+  maxRounds: number;
+  maxSpendEth: string;
 }
 
 export function TaskSubmitForm({ onSubmit, isLoading = false }: TaskSubmitFormProps) {
@@ -27,6 +30,9 @@ export function TaskSubmitForm({ onSubmit, isLoading = false }: TaskSubmitFormPr
     requiredNodes: 3,
     deadlineHours: 24,
     consensusType: ConsensusType.Majority,
+    continuous: false,
+    maxRounds: 5,
+    maxSpendEth: '1.0',
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof TaskFormData, string>>>({});
@@ -55,6 +61,18 @@ export function TaskSubmitForm({ onSubmit, isLoading = false }: TaskSubmitFormPr
 
     if (formData.deadlineHours < 1 || formData.deadlineHours > 720) {
       newErrors.deadlineHours = 'Deadline must be between 1 hour and 30 days';
+    }
+
+    if (formData.continuous) {
+      if (formData.maxRounds < 2 || formData.maxRounds > 100) {
+        newErrors.maxRounds = 'Max rounds must be between 2 and 100';
+      }
+      const maxSpend = parseFloat(formData.maxSpendEth);
+      if (isNaN(maxSpend) || maxSpend <= 0) {
+        newErrors.maxSpendEth = 'Max spend must be greater than 0';
+      } else if (maxSpend < parseFloat(formData.rewardPerNode || '0') * formData.requiredNodes) {
+        newErrors.maxSpendEth = 'Max spend must cover at least one round';
+      }
     }
 
     setErrors(newErrors);
@@ -262,6 +280,61 @@ export function TaskSubmitForm({ onSubmit, isLoading = false }: TaskSubmitFormPr
         </div>
       </Card>
 
+      {/* Continuous Mode */}
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h4 className="text-sm font-medium text-text">Continuous Mode</h4>
+            <p className="text-xs text-text-muted mt-0.5">Automatically re-run this task for multiple rounds</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={formData.continuous}
+            onClick={() => setFormData((prev) => ({ ...prev, continuous: !prev.continuous }))}
+            className={`
+              relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent
+              transition-colors focus:outline-none
+              ${formData.continuous ? 'bg-primary' : 'bg-border'}
+            `}
+          >
+            <span
+              className={`
+                inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform
+                ${formData.continuous ? 'translate-x-5' : 'translate-x-0'}
+              `}
+            />
+          </button>
+        </div>
+        {formData.continuous && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border">
+            <Input
+              label="Max Rounds"
+              type="number"
+              min="2"
+              max="100"
+              value={formData.maxRounds}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, maxRounds: parseInt(e.target.value) || 2 }))
+              }
+              error={errors.maxRounds}
+              hint="Total number of rounds to allow (2–100)"
+            />
+            <Input
+              label="Max Total Spend (ETH)"
+              type="number"
+              step="0.01"
+              min="0.001"
+              value={formData.maxSpendEth}
+              onChange={(e) => setFormData((prev) => ({ ...prev, maxSpendEth: e.target.value }))}
+              error={errors.maxSpendEth}
+              rightAddon={<span className="text-xs">ETH</span>}
+              hint="Hard cap on total ETH spent across all rounds"
+            />
+          </div>
+        )}
+      </Card>
+
       {/* Summary */}
       <Card className="bg-primary/5 border-primary/20">
         <h4 className="text-sm font-medium text-text mb-3">Cost Summary</h4>
@@ -269,21 +342,27 @@ export function TaskSubmitForm({ onSubmit, isLoading = false }: TaskSubmitFormPr
           <div>
             <p className="text-sm text-text-muted">
               {formData.rewardPerNode} ETH × {formData.requiredNodes} nodes
+              {formData.continuous && ` × up to ${formData.maxRounds} rounds`}
             </p>
             <p className="text-xs text-text-muted mt-1">
               Deadline: {formData.deadlineHours} hours from submission
             </p>
+            {formData.continuous && (
+              <p className="text-xs text-text-muted mt-1">
+                Max spend cap: {formData.maxSpendEth} ETH
+              </p>
+            )}
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold gradient-text">{totalReward.toFixed(4)} ETH</p>
-            <p className="text-xs text-text-muted">Total Cost</p>
+            <p className="text-xs text-text-muted">{formData.continuous ? 'Per Round' : 'Total Cost'}</p>
           </div>
         </div>
       </Card>
 
       {/* Submit */}
       <Button type="submit" size="lg" className="w-full" isLoading={isLoading}>
-        Submit Task
+        {formData.continuous ? 'Submit Continuous Task' : 'Submit Task'}
       </Button>
     </form>
   );

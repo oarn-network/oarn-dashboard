@@ -154,43 +154,122 @@ export function useNetworkHistory(days: number = 30) {
   return useQuery({
     queryKey: ['networkHistory', days],
     queryFn: async () => {
-      const data: { date: string; tasks: number; nodes: number; earnings: number }[] = [];
-      const now = Date.now();
+      if (!client) return [];
 
-      const [tasks, providers] = await Promise.all([
-        client?.getTasks() ?? Promise.resolve([]),
-        client?.getActiveProviders() ?? Promise.resolve([]),
+      const now = Date.now();
+      const cutoffMs = now - days * 24 * 60 * 60 * 1000;
+
+      const [createdEvents, rewardEvents, providers] = await Promise.all([
+        client.getTaskCreatedEvents(),
+        client.getRewardDistributedEvents(),
+        client.getActiveProviders(),
       ]);
 
-      const totalTasks = tasks.length;
       const nodeCount = providers.length;
 
+      // Collect unique block numbers across both event sets
+      const uniqueBlocks = Array.from(new Set([
+        ...createdEvents.map(e => e.blockNumber),
+        ...rewardEvents.map(e => e.blockNumber),
+      ].filter((n): n is bigint => n !== null && n !== undefined)));
+
+      const timestamps = await Promise.all(uniqueBlocks.map(n => client.getBlockTimestamp(n)));
+      const blockTimeMap = new Map<string, number>(
+        uniqueBlocks.map((n, i) => [n.toString(), timestamps[i]])
+      );
+
+      // Build date-keyed buckets for the window
+      const bucketKeys: string[] = [];
+      const buckets = new Map<string, { newTasks: number; earnings: number }>();
       for (let i = days; i >= 0; i--) {
-        const date = new Date(now - i * 24 * 60 * 60 * 1000);
-        const slotIdx = days - i; // 0 = oldest, days = today
+        const key = new Date(now - i * 24 * 60 * 60 * 1000)
+          .toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        bucketKeys.push(key);
+        buckets.set(key, { newTasks: 0, earnings: 0 });
+      }
 
-        // Cumulative task count at this slot (tasks ~= sequential by time)
-        const cumulative = totalTasks > 0 ? Math.round(totalTasks * slotIdx / days) : 0;
-        const prevCumulative = totalTasks > 0 && slotIdx > 0
-          ? Math.round(totalTasks * (slotIdx - 1) / days)
-          : 0;
+      // Bin TaskCreated events
+      for (const event of createdEvents) {
+        const ts = blockTimeMap.get(event.blockNumber?.toString() ?? '');
+        if (!ts || ts * 1000 < cutoffMs) continue;
+        const key = new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const b = buckets.get(key);
+        if (b) b.newTasks++;
+      }
 
-        const slotTasks = tasks.slice(prevCumulative, cumulative);
-        const earnings = slotTasks.reduce((s, t) => {
-          return s + parseFloat(formatUnits(t.rewardPerNode * BigInt(t.requiredNodes), 18));
-        }, 0);
+      // Bin RewardDistributed events
+      for (const event of rewardEvents) {
+        const ts = blockTimeMap.get(event.blockNumber?.toString() ?? '');
+        if (!ts || ts * 1000 < cutoffMs) continue;
+        const key = new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const b = buckets.get(key);
+        if (b) b.earnings += parseFloat(formatUnits(event.args?.amount ?? BigInt(0), 18));
+      }
 
-        data.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          tasks: cumulative,
+      return bucketKeys.map((date) => {
+        const b = buckets.get(date)!;
+        return {
+          date,
+          tasks: b.newTasks,
           nodes: nodeCount,
-          earnings: parseFloat(earnings.toFixed(4)),
+          earnings: parseFloat(b.earnings.toFixed(4)),
+        };
+      });
+    },
+    staleTime: REFRESH_INTERVALS.NETWORK_STATS,
+  });
+}
+
+export function useFundedTasks() {
+  const { client, address } = useOARNClient();
+
+  return useQuery({
+    queryKey: ['fundedTasks', address],
+    queryFn: async () => {
+      if (!client || !address) return [];
+
+      const events = await client.getTaskFundedEvents(address);
+      if (events.length === 0) return [];
+
+      const taskIds = Array.from(new Set(
+        events.map(e => Number(e.args?.taskId ?? 0)).filter(Boolean)
+      ));
+      const uniqueBlocks = Array.from(new Set(
+        events.map(e => e.blockNumber).filter((n): n is bigint => n !== null && n !== undefined)
+      ));
+
+      const [tasks, timestamps] = await Promise.all([
+        Promise.all(taskIds.map(id => client.getTask(id))),
+        Promise.all(uniqueBlocks.map(n => client.getBlockTimestamp(n))),
+      ]);
+
+      const taskMap = new Map(tasks.filter(Boolean).map(t => [t!.id, t!]));
+      const blockTimeMap = new Map(uniqueBlocks.map((n, i) => [n.toString(), timestamps[i]]));
+
+      // Sum contributions per taskId, keep earliest timestamp
+      const contribMap = new Map<number, { amount: bigint; timestamp: number }>();
+      for (const event of events) {
+        const taskId = Number(event.args?.taskId ?? 0);
+        if (!taskId) continue;
+        const ts = blockTimeMap.get(event.blockNumber?.toString() ?? '') ?? 0;
+        const existing = contribMap.get(taskId);
+        contribMap.set(taskId, {
+          amount: (existing?.amount ?? BigInt(0)) + (event.args?.fundingAmount ?? BigInt(0)),
+          timestamp: existing ? Math.min(existing.timestamp, ts) : ts,
         });
       }
 
-      return data;
+      return Array.from(contribMap.entries())
+        .map(([taskId, contrib]) => ({
+          taskId,
+          amount: contrib.amount,
+          timestamp: contrib.timestamp,
+          task: taskMap.get(taskId) ?? null,
+        }))
+        .sort((a, b) => b.timestamp - a.timestamp);
     },
-    staleTime: REFRESH_INTERVALS.NETWORK_STATS,
+    enabled: !!client && !!address,
+    refetchInterval: REFRESH_INTERVALS.TASKS,
   });
 }
 

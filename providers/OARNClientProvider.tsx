@@ -390,6 +390,15 @@ export class OARNClient {
     return Number(block.timestamp);
   }
 
+  async getTaskCreatedEvents() {
+    return this.pc.getLogs({
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      event: parseAbiItem('event TaskCreated(uint256 indexed taskId, address indexed requester, bytes32 modelHash, uint256 rewardPerNode, uint256 requiredNodes, uint8 consensusType)'),
+      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+      toBlock: 'latest',
+    });
+  }
+
   async getTaskClaimedEvents(taskId?: number) {
     return this.pc.getLogs({
       address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,

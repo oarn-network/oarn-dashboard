@@ -20,6 +20,15 @@ export default function InvestorDashboard() {
 
   const taskList = stats?.tasks ?? [];
 
+  // Real 7-day trends derived from on-chain history
+  const last7 = history.slice(-7);
+  const prev7 = history.slice(-14, -7);
+  const last7Tasks = last7.reduce((s, d) => s + d.tasks, 0);
+  const prev7Tasks = prev7.reduce((s, d) => s + d.tasks, 0);
+  const tasksTrend = prev7Tasks > 0
+    ? { value: Math.abs(Math.round(((last7Tasks - prev7Tasks) / prev7Tasks) * 100)), isPositive: last7Tasks >= prev7Tasks }
+    : undefined;
+
   const STATUS_PIE_COLORS: Partial<Record<TaskStatus, string>> = {
     [TaskStatus.Pending]:   '#f59e0b',
     [TaskStatus.Active]:    '#22d3ee',
@@ -80,7 +89,7 @@ export default function InvestorDashboard() {
               />
             </svg>
           }
-          trend={{ value: 23, isPositive: true }}
+          trend={tasksTrend}
         />
         <StatCard
           title="Active Nodes"
@@ -95,7 +104,6 @@ export default function InvestorDashboard() {
               />
             </svg>
           }
-          trend={{ value: 12, isPositive: true }}
         />
         <StatCard
           title="Completed Tasks"
@@ -124,7 +132,6 @@ export default function InvestorDashboard() {
               />
             </svg>
           }
-          trend={{ value: 8, isPositive: true }}
         />
       </StatGrid>
 

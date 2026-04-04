@@ -33,6 +33,7 @@ export {
   useNodeReputation,
   useMyCompletedTasks,
   useMyCrowdfunderStats,
+  useFundedTasks,
   useModelFrameworks,
   useTokenMetrics,
 } from './useNetworkStats';

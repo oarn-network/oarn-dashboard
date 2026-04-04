@@ -27,10 +27,39 @@ const TASK_REGISTRY_ABI = parseAbi([
 // OARNRegistry — used only for isNodeActive check.
 // getActiveRPCProviders() returns RPCProvider structs (RPC infrastructure endpoints,
 // NOT compute nodes). Active compute nodes are derived from RewardDistributed events.
-const OARN_REGISTRY_ABI = parseAbi([
-  'function getActiveRPCProviders() view returns (tuple(string endpoint, string onionEndpoint, address owner, uint256 stake, uint256 registeredAt, uint256 lastHeartbeat, uint256 uptime, uint256 reportCount, bool isActive)[])',
-  'function isNodeActive(address node) view returns (bool)',
-]);
+// Note: JSON ABI format used here because abitype cannot parse `string` inside
+// tuple return types in the human-readable format (abitype limitation).
+const OARN_REGISTRY_ABI = [
+  {
+    type: 'function',
+    name: 'getActiveRPCProviders',
+    inputs: [],
+    outputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 'endpoint',        type: 'string'  },
+          { name: 'onionEndpoint',   type: 'string'  },
+          { name: 'owner',           type: 'address' },
+          { name: 'stake',           type: 'uint256' },
+          { name: 'registeredAt',    type: 'uint256' },
+          { name: 'lastHeartbeat',   type: 'uint256' },
+          { name: 'uptime',          type: 'uint256' },
+          { name: 'reportCount',     type: 'uint256' },
+          { name: 'isActive',        type: 'bool'    },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'isNodeActive',
+    inputs:  [{ name: 'node', type: 'address' }],
+    outputs: [{ type: 'bool' }],
+    stateMutability: 'view',
+  },
+] as const;
 
 const ERC20_ABI = parseAbi([
   'function balanceOf(address account) view returns (uint256)',

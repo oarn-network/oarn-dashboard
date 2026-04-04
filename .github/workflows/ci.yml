@@ -1,4 +1,4 @@
-name: Dashboard CI
+name: CI
 
 on:
   push:
@@ -7,22 +7,23 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  check:
+    name: Type-check, lint, build
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check
+      - name: Type-check
         run: npx tsc --noEmit
 
       - name: Lint
@@ -31,4 +32,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'ci-placeholder' }}
+          # Stub values for CI — real values live in Vercel environment variables.
+          # All NEXT_PUBLIC_* vars that lack a ?? default in constants.ts must be listed here.
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ci_stub

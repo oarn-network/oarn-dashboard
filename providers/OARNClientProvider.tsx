@@ -60,6 +60,7 @@ export interface Task {
   completedNodes?: number;
   consensusType: ConsensusType;
   resultHash?: string;
+  name?: string;   // resolved from modelRequirements calldata
 }
 
 export interface Balance {
@@ -116,6 +117,8 @@ export class OARNClient {
     this._writeContractAsync = options.writeContractAsync ?? null;
     this._publicClient = options.publicClient;
   }
+
+  private _taskNameCache = new Map<number, string>();
 
   private get pc(): PublicClientInstance {
     if (!this._publicClient) throw new Error('Public client not available');
@@ -175,6 +178,29 @@ export class OARNClient {
       functionName: 'taskCount',
     });
     return Number(count);
+  }
+
+  async getTaskName(taskId: number): Promise<string> {
+    if (this._taskNameCache.has(taskId)) return this._taskNameCache.get(taskId)!;
+
+    try {
+      const logs = await this.pc.getLogs({
+        address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+        event: parseAbiItem('event TaskCreated(uint256 indexed taskId, address indexed requester, bytes32 modelHash, uint256 rewardPerNode, uint256 requiredNodes, uint8 consensusType)'),
+        args: { taskId: BigInt(taskId) },
+        fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+        toBlock: 'latest',
+      });
+      const txHash = logs[0]?.transactionHash;
+      if (!txHash) return `Task #${taskId}`;
+      const tx = await this.pc.getTransaction({ hash: txHash });
+      const { args } = decodeFunctionData({ abi: SUBMIT_TASK_ABI, data: tx.input });
+      const name = (args[2] as string)?.trim() || `Task #${taskId}`;
+      this._taskNameCache.set(taskId, name);
+      return name;
+    } catch {
+      return `Task #${taskId}`;
+    }
   }
 
   async getTasks(filter?: TaskFilter): Promise<Task[]> {

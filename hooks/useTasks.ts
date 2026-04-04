@@ -49,6 +49,17 @@ export function useConsensusStatus(taskId: number | null) {
   });
 }
 
+export function useTaskName(taskId: number | null) {
+  const { client } = useOARNClient();
+
+  return useQuery({
+    queryKey: ['taskName', taskId],
+    queryFn: () => (taskId !== null ? client?.getTaskName(taskId) : Promise.resolve(`Task #${taskId}`)),
+    enabled: !!client && taskId !== null,
+    staleTime: Infinity, // name never changes once set
+  });
+}
+
 export function useTaskNodes(taskId: number | null) {
   const { client } = useOARNClient();
 

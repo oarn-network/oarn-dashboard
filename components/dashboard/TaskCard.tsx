@@ -3,6 +3,7 @@
 import { Card, Button, StatusBadge, Badge } from '@/components/ui';
 import { formatEth, formatAddress, formatHash, formatDeadline } from '@/lib/formatters';
 import { TaskStatus, ConsensusType, TASK_STATUS_LABELS, CONSENSUS_TYPE_LABELS } from '@/lib/constants';
+import { useTaskName } from '@/hooks';
 import type { Task } from '@/providers/OARNClientProvider';
 
 interface TaskCardProps {
@@ -26,6 +27,7 @@ export function TaskCard({
   onSubmitResult,
   isLoading = false,
 }: TaskCardProps) {
+  const { data: taskName } = useTaskName(task.id);
   const statusKey = TASK_STATUS_LABELS[task.status].toLowerCase() as
     | 'pending'
     | 'active'
@@ -76,7 +78,7 @@ export function TaskCard({
 
       {/* Body */}
       <h3 className="text-lg font-semibold text-text mb-2">
-        Model Inference Task
+        {taskName ?? `Task #${task.id}`}
       </h3>
       <p className="text-sm text-text-muted mb-4">
         {task.status === TaskStatus.Pending

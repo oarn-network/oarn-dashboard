@@ -3,6 +3,7 @@ export {
   useTasks,
   useTask,
   useTaskCount,
+  useTaskName,
   useConsensusStatus,
   useTaskNodes,
   useMyTasks,

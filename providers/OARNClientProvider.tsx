@@ -24,10 +24,11 @@ const TASK_REGISTRY_ABI = parseAbi([
   'function fundTask(uint256 taskId) payable',
 ]);
 
-// OARNRegistry ABI kept for reference but not currently used for reads
-// (active node list is derived from on-chain events instead)
+// OARNRegistry — used only for isNodeActive check.
+// getActiveRPCProviders() returns RPCProvider structs (RPC infrastructure endpoints,
+// NOT compute nodes). Active compute nodes are derived from RewardDistributed events.
 const OARN_REGISTRY_ABI = parseAbi([
-  'function getActiveRPCProviders() view returns (address[])',
+  'function getActiveRPCProviders() view returns (tuple(string endpoint, string onionEndpoint, address owner, uint256 stake, uint256 registeredAt, uint256 lastHeartbeat, uint256 uptime, uint256 reportCount, bool isActive)[])',
   'function isNodeActive(address node) view returns (bool)',
 ]);
 

@@ -23,6 +23,7 @@ export {
   useCastVote,
   useDelegateGov,
 } from './useGovernance';
+export { useGOVSaleInfo, useWalletSaleInfo, useBuyGOV } from './useBuyGOV';
 export {
   useActiveProviders,
   useNetworkStats,

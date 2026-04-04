@@ -6,6 +6,8 @@ export const CONTRACT_ADDRESSES = {
   GOV_TOKEN: '0xB97eDD49C225d2c43e7203aB9248cAbED2B268d3',
   GOVERNANCE: '0x56D2826FF4FaEF8d4Db54eF11e86d0421fc2893B' as string,
   WET_LAB_ORACLE: '0xF8991A56cB5B9073a3eEC87E95Dfb055fdDF0094',
+  // Set after deploying GOVSale.sol (scripts/deploy-gov-sale.ts)
+  GOV_SALE: process.env.NEXT_PUBLIC_GOV_SALE_ADDRESS ?? '',
 } as const;
 
 // Chain configuration

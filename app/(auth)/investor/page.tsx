@@ -9,6 +9,7 @@ import { useGovernanceProposals, type GovernanceProposal } from '@/hooks/useGove
 import { formatUnits } from 'viem';
 import { ProposalState, PROPOSAL_STATE_LABELS, TaskStatus, TASK_STATUS_LABELS } from '@/lib/constants';
 import { formatEth, formatCompactNumber } from '@/lib/formatters';
+import { BuyGOVPanel } from '@/components/investor/BuyGOVPanel';
 
 export default function InvestorDashboard() {
   const { data: stats, isLoading: loadingStats } = useNetworkStats();
@@ -149,7 +150,8 @@ export default function InvestorDashboard() {
       </div>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <BuyGOVPanel />
         <WalletBalances balance={balance ?? null} isLoading={loadingBalance} />
 
         {/* Token Metrics */}

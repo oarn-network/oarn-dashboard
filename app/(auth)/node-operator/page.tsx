@@ -75,6 +75,20 @@ export default function NodeOperatorDashboard() {
   const totalEarnings = balance?.comp ?? BigInt(0);
   const activeTaskCount = activeTasks.length;
 
+  // 7-day trends derived from real earnings history
+  const last7 = earningsHistory.slice(-7);
+  const prev7 = earningsHistory.slice(-14, -7);
+  const last7Earnings = last7.reduce((s, d) => s + d.earnings, 0);
+  const prev7Earnings = prev7.reduce((s, d) => s + d.earnings, 0);
+  const earningsTrend = prev7Earnings > 0
+    ? { value: Math.abs(Math.round(((last7Earnings - prev7Earnings) / prev7Earnings) * 100)), isPositive: last7Earnings >= prev7Earnings }
+    : undefined;
+  const last7Tasks = last7.reduce((s, d) => s + d.tasks, 0);
+  const prev7Tasks = prev7.reduce((s, d) => s + d.tasks, 0);
+  const tasksTrend = prev7Tasks > 0
+    ? { value: Math.abs(Math.round(((last7Tasks - prev7Tasks) / prev7Tasks) * 100)), isPositive: last7Tasks >= prev7Tasks }
+    : undefined;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -98,7 +112,7 @@ export default function NodeOperatorDashboard() {
               />
             </svg>
           }
-          trend={{ value: 15, isPositive: true }}
+          trend={tasksTrend}
         />
         <StatCard
           title="Active Tasks"
@@ -127,7 +141,7 @@ export default function NodeOperatorDashboard() {
               />
             </svg>
           }
-          trend={{ value: 8, isPositive: true }}
+          trend={earningsTrend}
         />
         <StatCard
           title="Reputation Score"

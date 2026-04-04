@@ -7,7 +7,7 @@ import { Card, Button } from '@/components/ui';
 import { useNetworkStats, useNetworkHistory, useMyBalance, useTokenMetrics } from '@/hooks';
 import { useGovernanceProposals, type GovernanceProposal } from '@/hooks/useGovernance';
 import { formatUnits } from 'viem';
-import { ProposalState, PROPOSAL_STATE_LABELS } from '@/lib/constants';
+import { ProposalState, PROPOSAL_STATE_LABELS, TaskStatus } from '@/lib/constants';
 import { formatEth, formatCompactNumber } from '@/lib/formatters';
 
 export default function InvestorDashboard() {
@@ -16,6 +16,12 @@ export default function InvestorDashboard() {
   const { data: balance, isLoading: loadingBalance } = useMyBalance();
   const { data: tokenMetrics } = useTokenMetrics();
   const { data: proposals = [] } = useGovernanceProposals();
+
+  const taskList = stats?.tasks ?? [];
+  const activeCount = taskList.filter(
+    t => t.status === TaskStatus.Active || t.status === TaskStatus.Consensus
+  ).length;
+  const pendingCount = taskList.filter(t => t.status === TaskStatus.Pending).length;
 
   return (
     <div className="space-y-8">
@@ -123,11 +129,15 @@ export default function InvestorDashboard() {
 
         <PieChart
           title="Task Distribution"
-          data={[
-            { name: 'Completed', value: stats?.completedTasks ?? 75, color: '#22c55e' },
-            { name: 'Active', value: Math.floor((stats?.totalTasks ?? 100) * 0.15), color: '#22d3ee' },
-            { name: 'Pending', value: Math.floor((stats?.totalTasks ?? 100) * 0.1), color: '#f59e0b' },
-          ]}
+          data={
+            (stats?.totalTasks ?? 0) > 0
+              ? [
+                  { name: 'Completed', value: stats?.completedTasks ?? 0, color: '#22c55e' },
+                  { name: 'Active', value: activeCount, color: '#22d3ee' },
+                  { name: 'Pending', value: pendingCount, color: '#f59e0b' },
+                ]
+              : [{ name: 'No tasks yet', value: 1, color: '#374151' }]
+          }
           height={300}
         />
       </div>

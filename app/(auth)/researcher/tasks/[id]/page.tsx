@@ -2,9 +2,9 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { Card, Button, Badge, StatusBadge, Spinner, useToast } from '@/components/ui';
-import { useTask, useConsensusStatus, useTaskNodes, useCancelTask } from '@/hooks';
-import { formatEth, formatAddress, formatHash, formatDeadline, formatDateTime, getArbiscanUrl } from '@/lib/formatters';
+import { Card, Button, Badge, StatusBadge, Spinner } from '@/components/ui';
+import { useTask, useConsensusStatus, useTaskNodes } from '@/hooks';
+import { formatEth, formatAddress, formatHash, formatDeadline, getArbiscanUrl } from '@/lib/formatters';
 import { TaskStatus, ConsensusType, TASK_STATUS_LABELS, CONSENSUS_TYPE_LABELS } from '@/lib/constants';
 
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,26 +13,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const { data: task, isLoading: loadingTask } = useTask(taskId);
   const { data: consensus } = useConsensusStatus(taskId);
   const { data: nodes = [] } = useTaskNodes(taskId);
-  const cancelMutation = useCancelTask();
-  const { addToast } = useToast();
-
-  const handleCancel = async () => {
-    try {
-      await cancelMutation.mutateAsync(taskId);
-      addToast({
-        type: 'success',
-        title: 'Task Cancelled',
-        message: 'Your task has been cancelled',
-      });
-    } catch (error) {
-      addToast({
-        type: 'error',
-        title: 'Failed to Cancel',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  };
-
   if (loadingTask) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -85,11 +65,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             <p className="text-text-muted mt-1">Submitted by {formatAddress(task.requester)}</p>
           </div>
         </div>
-        {task.status === TaskStatus.Pending && (
-          <Button variant="danger" onClick={handleCancel} isLoading={cancelMutation.isPending}>
-            Cancel Task
-          </Button>
-        )}
       </div>
 
       {/* Main Content */}

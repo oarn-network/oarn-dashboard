@@ -28,6 +28,11 @@ const TASK_REGISTRY_ABI = parseAbi([
   'function getTaskMode(uint256 taskId) view returns (uint8)',
   'function continuousParent(uint256 taskId) view returns (uint256)',
   'function getContinuousInfo(uint256 taskId) view returns (uint256 maxRounds, uint256 roundsTriggered, uint256 maxSpendWei, uint256 totalSpent, bool active, uint256[] roundTaskIds)',
+  // #126 — COMP payment
+  'function compPaymentEnabled() view returns (bool)',
+  'function compDiscountBps() view returns (uint256)',
+  'function taskCompRewardPerNode(uint256 taskId) view returns (uint256)',
+  'function submitTaskWithCOMP(bytes32 modelHash, bytes32 inputHash, string modelRequirements, uint256 rewardPerNode, uint256 requiredNodes, uint256 deadline, uint8 consensusType) returns (uint256)',
 ]);
 
 // OARNRegistry — used only for isNodeActive check.
@@ -70,6 +75,8 @@ const OARN_REGISTRY_ABI = [
 const ERC20_ABI = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
   'function totalSupply() view returns (uint256)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
 ]);
 
 const SUBMIT_TASK_ABI = parseAbi([

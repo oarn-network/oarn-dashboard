@@ -26,6 +26,8 @@ export {
 export { useGOVSaleInfo, useWalletSaleInfo, useBuyGOV } from './useBuyGOV';
 export { useBatchResults, computeBatchMetrics, generateCSV } from './useBatchResults';
 export type { TaskResult, BatchMetrics } from './useBatchResults';
+export { useCompPaymentInfo, useCompAllowance, useSubmitTaskWithCOMP } from './useCompPayment';
+export type { SubmitTaskWithCOMPParams } from './useCompPayment';
 export {
   useActiveProviders,
   useNetworkStats,

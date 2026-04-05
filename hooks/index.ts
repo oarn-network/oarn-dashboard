@@ -24,6 +24,8 @@ export {
   useDelegateGov,
 } from './useGovernance';
 export { useGOVSaleInfo, useWalletSaleInfo, useBuyGOV } from './useBuyGOV';
+export { useBatchResults, computeBatchMetrics, generateCSV } from './useBatchResults';
+export type { TaskResult, BatchMetrics } from './useBatchResults';
 export {
   useActiveProviders,
   useNetworkStats,

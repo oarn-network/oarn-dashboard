@@ -28,7 +28,7 @@ export function TaskSubmitForm({ onSubmit, isLoading = false }: TaskSubmitFormPr
     inputFile: null,
     rewardPerNode: '0.1',
     requiredNodes: 3,
-    deadlineHours: 24,
+    deadlineHours: 72,
     consensusType: ConsensusType.Majority,
     continuous: false,
     maxRounds: 5,

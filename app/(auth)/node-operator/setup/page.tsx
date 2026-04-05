@@ -224,107 +224,178 @@ function Step2() {
 }
 
 function Step3() {
+  const [method, setMethod] = useState<'docker' | 'binary' | 'source'>('docker');
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-text mb-2">Download the Node Binary</h2>
+        <h2 className="text-xl font-semibold text-text mb-2">Install the Node</h2>
         <p className="text-text-muted text-sm">
-          Download the latest pre-built binary for Linux x86_64 from the GitHub releases page.
+          Choose your installation method. Docker is the easiest — no dependency setup required.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <p className="text-sm font-medium text-text mb-2">1. Download the latest release</p>
-          <CodeBlock code={`# Download the latest oarn-node binary
-wget https://github.com/oarn-network/oarn-node/releases/latest/download/oarn-node-linux-x86_64.tar.gz
-
-# Extract
-tar -xzf oarn-node-linux-x86_64.tar.gz
-
-# Make executable and move to PATH
-chmod +x oarn-node
-sudo mv oarn-node /usr/local/bin/`} />
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-text mb-2">2. Verify the installation</p>
-          <CodeBlock code={`oarn-node --version`} />
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-text mb-2">3. Create the node directory</p>
-          <CodeBlock code={`sudo mkdir -p /opt/oarn/node
-sudo chown $USER:$USER /opt/oarn/node`} />
-        </div>
+      {/* Method selector */}
+      <div className="flex gap-2 p-1 bg-background rounded-lg border border-border">
+        {(['docker', 'binary', 'source'] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMethod(m)}
+            className={`flex-1 py-1.5 px-3 rounded text-sm font-medium transition-colors capitalize ${
+              method === m
+                ? 'bg-primary text-white'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            {m === 'docker' ? 'Docker (recommended)' : m === 'binary' ? 'Pre-built Binary' : 'Build from Source'}
+          </button>
+        ))}
       </div>
 
-      <Card padding="md" className="border-border">
-        <div className="flex items-center justify-between">
+      {method === 'docker' && (
+        <div className="space-y-4">
+          <Card padding="md" className="border-primary/20 bg-primary/5">
+            <p className="text-sm text-text-muted">
+              <span className="text-text font-medium">Easiest option.</span> Docker handles all dependencies automatically. You only need Docker installed.
+            </p>
+          </Card>
           <div>
-            <p className="text-sm font-medium text-text">Need the source code?</p>
-            <p className="text-xs text-text-muted mt-1">Build from source or view the latest releases on GitHub</p>
+            <p className="text-sm font-medium text-text mb-2">1. Install Docker (if not already installed)</p>
+            <CodeBlock code={`curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Log out and back in for the group change to take effect`} />
           </div>
-          <a
-            href="https://github.com/oarn-network/oarn-node"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button variant="secondary" size="sm">
-              GitHub →
-            </Button>
-          </a>
+          <div>
+            <p className="text-sm font-medium text-text mb-2">2. Pull the node image</p>
+            <CodeBlock code={`docker pull ghcr.io/oarn-network/oarn-node:latest`} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text mb-2">3. Verify it works</p>
+            <CodeBlock code={`docker run --rm ghcr.io/oarn-network/oarn-node:latest --version`} />
+          </div>
         </div>
-      </Card>
+      )}
+
+      {method === 'binary' && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-medium text-text mb-2">1. Download the latest release</p>
+            <CodeBlock code={`wget https://github.com/oarn-network/oarn-node/releases/latest/download/oarn-node-linux-x86_64.tar.gz
+tar -xzf oarn-node-linux-x86_64.tar.gz
+chmod +x oarn-node
+sudo mv oarn-node /usr/local/bin/`} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text mb-2">2. Verify the installation</p>
+            <CodeBlock code={`oarn-node --version`} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text mb-2">3. Create the node directory</p>
+            <CodeBlock code={`sudo mkdir -p /opt/oarn/cache
+sudo chown -R $USER:$USER /opt/oarn`} />
+          </div>
+        </div>
+      )}
+
+      {method === 'source' && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-medium text-text mb-2">1. Install Rust (1.75+)</p>
+            <CodeBlock code={`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env`} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text mb-2">2. Clone and build</p>
+            <CodeBlock code={`git clone https://github.com/oarn-network/oarn-network.git
+cd oarn-network/oarn-node
+
+# CPU-only (default)
+cargo build --release --features compute
+
+# With NVIDIA GPU support
+cargo build --release --features compute,cuda
+
+# With AMD GPU support
+cargo build --release --features compute,rocm`} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text mb-2">3. Install the binary</p>
+            <CodeBlock code={`sudo cp target/release/oarn-node /usr/local/bin/
+sudo mkdir -p /opt/oarn/cache
+sudo chown -R $USER:$USER /opt/oarn`} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function Step4() {
-  const configToml = `[node]
-# Your node's unique name (visible on leaderboard)
-name = "my-oarn-node"
-
-# Wallet private key (without 0x prefix)
-private_key = "YOUR_PRIVATE_KEY_HERE"
+  const configToml = `mode = "standard"
 
 [network]
-# Arbitrum Sepolia RPC endpoint
-rpc_url = "https://sepolia-rollup.arbitrum.io/rpc"
+listen_addresses = ["/ip4/0.0.0.0/tcp/4001"]
+max_peers = 50
+
+[network.discovery]
+method = "manual"
+# Leave empty — the node finds peers via the IPFS DHT automatically.
+# If you have trouble connecting, ask in Discord for a bootstrap multiaddr.
+manual_bootstrap = []
+
+[blockchain]
 chain_id = 421614
+rpc_discovery = "manual"
+manual_rpc_url = "https://sepolia-rollup.arbitrum.io/rpc"
+rpc_redundancy = 1
 
-[contracts]
-# Do not modify — official testnet contract addresses
-oarn_registry = "0x8DD738DBBD4A8484872F84192D011De766Ba5458"
-task_registry = "0xD15530ce13188EE88E43Ab07EDD9E8729fCc55D0"
+[blockchain.contracts]
+# Official Arbitrum Sepolia testnet addresses — do not modify
+task_registry_v2 = "0xD15530ce13188EE88E43Ab07EDD9E8729fCc55D0"
+oarn_registry    = "0xa122518Cb6E66A804fc37EB26c8a7aF309dCF04C"
+token_reward     = "0x24249A523A251E38CB0001daBd54DD44Ea8f1838"
+gov_token        = "0xB97eDD49C225d2c43e7203aB9248cAbED2B268d3"
 
-[execution]
-# Maximum concurrent tasks
-max_concurrent_tasks = 3
+[storage]
+ipfs_api    = "http://127.0.0.1:5001"
+cache_dir   = "/opt/oarn/cache"
+max_cache_mb = 5000
 
-# Poll interval in seconds
-poll_interval = 30
+[compute]
+max_ram_mb       = 8192
+frameworks       = ["onnx"]
+concurrent_tasks = 1
 
-[ipfs]
-api_url = "http://127.0.0.1:5001/api/v0"`;
+[privacy]
+tor_enabled     = false
+padding_enabled = false`;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-text mb-2">Configure Your Node</h2>
         <p className="text-text-muted text-sm">
-          Create a <code className="text-primary bg-primary/10 px-1 rounded">config.toml</code> file for your node.
-          Replace <code className="text-primary bg-primary/10 px-1 rounded">YOUR_PRIVATE_KEY_HERE</code> with your wallet&apos;s private key.
+          Set your private key as an environment variable, then create the config file.
         </p>
       </div>
 
+      {/* Private key — env var first */}
       <div>
-        <p className="text-sm font-medium text-text mb-2">Create the config file</p>
-        <CodeBlock code={`nano /opt/oarn/node/config.toml`} />
+        <p className="text-sm font-medium text-text mb-1">1. Set your private key (never put it in a file)</p>
+        <p className="text-xs text-text-muted mb-2">
+          Export the variable before starting the node. For servers, add it to <code className="bg-background px-1 rounded">/etc/environment</code> or a <code className="bg-background px-1 rounded">.env</code> file that is not committed to Git.
+        </p>
+        <CodeBlock code={`export OARN_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE`} />
+      </div>
+
+      {/* Config file */}
+      <div>
+        <p className="text-sm font-medium text-text mb-1">2. Create the config file</p>
+        <CodeBlock code={`nano /opt/oarn/config.toml`} />
       </div>
 
       <div>
-        <p className="text-sm font-medium text-text mb-2">Paste this content:</p>
+        <p className="text-sm font-medium text-text mb-2">3. Paste this content (addresses are correct — do not change):</p>
         <CodeBlock code={configToml} />
       </div>
 
@@ -334,9 +405,8 @@ api_url = "http://127.0.0.1:5001/api/v0"`;
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <div className="text-sm text-text-muted">
-            <span className="text-error font-medium">Never share your private key.</span> Add{' '}
-            <code className="bg-background px-1 rounded">config.toml</code> to{' '}
-            <code className="bg-background px-1 rounded">.gitignore</code> if using Git. Consider using environment variables for the key in production.
+            <span className="text-error font-medium">Never put your private key in config.toml or commit it to Git.</span>{' '}
+            Always use the <code className="bg-background px-1 rounded">OARN_PRIVATE_KEY</code> environment variable.
           </div>
         </div>
       </Card>
@@ -350,54 +420,79 @@ function Step5() {
       <div>
         <h2 className="text-xl font-semibold text-text mb-2">Start Your Node</h2>
         <p className="text-text-muted text-sm">
-          Launch your node and confirm it&apos;s polling for tasks on the network.
+          Launch your node and confirm it is connected and polling for tasks.
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
+        {/* Docker */}
         <div>
-          <p className="text-sm font-medium text-text mb-2">Option A — Run directly (foreground)</p>
-          <CodeBlock code={`oarn-node --config /opt/oarn/node/config.toml start`} />
+          <p className="text-sm font-medium text-text mb-2">If you installed via Docker</p>
+          <CodeBlock code={`docker run -d \\
+  --name oarn-node \\
+  --restart unless-stopped \\
+  -e OARN_PRIVATE_KEY=0xYOUR_PRIVATE_KEY \\
+  -v /opt/oarn/config.toml:/config/config.toml:ro \\
+  -v /opt/oarn/cache:/data/cache \\
+  ghcr.io/oarn-network/oarn-node:latest
+
+# Follow logs
+docker logs -f oarn-node`} />
         </div>
 
+        {/* Binary / source */}
         <div>
-          <p className="text-sm font-medium text-text mb-2">Option B — Run with PM2 (recommended for servers)</p>
-          <CodeBlock code={`# Install PM2 if not already installed
+          <p className="text-sm font-medium text-text mb-2">If you installed the binary or built from source</p>
+          <CodeBlock code={`# Make sure OARN_PRIVATE_KEY is exported first (see Step 4)
+
+# Option A — foreground (useful for first-run testing)
+oarn-node --config /opt/oarn/config.toml start
+
+# Option B — background with PM2 (recommended for servers)
 npm install -g pm2
-
-# Start the node
-pm2 start /usr/local/bin/oarn-node \
-  --name oarn-node \
-  --interpreter none \
-  -- --config /opt/oarn/node/config.toml start
-
-# Save so it restarts on reboot
-pm2 save
-pm2 startup`} />
+pm2 start oarn-node \\
+  --name oarn-node \\
+  --interpreter none \\
+  -- --config /opt/oarn/config.toml start
+pm2 save && pm2 startup`} />
         </div>
 
         <div>
-          <p className="text-sm font-medium text-text mb-2">Check node logs</p>
-          <CodeBlock code={`# PM2 logs
-pm2 logs oarn-node
-
-# Or follow the raw log
-journalctl -u oarn-node -f`} />
+          <p className="text-sm font-medium text-text mb-2">Check logs</p>
+          <CodeBlock code={`pm2 logs oarn-node       # if using PM2
+docker logs -f oarn-node # if using Docker`} />
         </div>
       </div>
 
       <div className="p-4 bg-background rounded-lg border border-border">
-        <p className="text-sm font-medium text-text mb-3">You should see output like:</p>
+        <p className="text-sm font-medium text-text mb-3">Healthy startup looks like this:</p>
         <pre className="text-xs text-success font-mono leading-relaxed whitespace-pre-wrap">
-{`[INFO] OARN Node v0.1.x starting...
+{`[INFO] OARN Node v0.x.x starting...
 [INFO] Wallet: 0xYOUR_ADDRESS
 [INFO] Connected to Arbitrum Sepolia (chain 421614)
-[INFO] TaskRegistryV2 initialized at 0xD155...
-[INFO] Polling for tasks every 30s...
-[INFO] Total task count on TaskRegistryV2: 3
-[INFO] Task #4 is available!
-[INFO] Claiming task #4 on TaskRegistryV2...`}
+[INFO] TaskRegistryV2 at 0xD15530ce13188EE88E43Ab07EDD9E8729fCc55D0
+[INFO] Polling for available V2 tasks (consensus)...
+[INFO] Total task count on TaskRegistryV2: 5
+[INFO] Task #5 is available!
+[INFO] Claiming task #5 on TaskRegistryV2...
+[INFO] Task #5 claimed. Downloading model from IPFS...
+[INFO] Running inference...
+[INFO] Submitting result hash 0xabc...`}
         </pre>
+      </div>
+
+      <div className="p-4 bg-background rounded-lg border border-border space-y-3">
+        <p className="text-sm font-medium text-text">Common first-run messages (not errors)</p>
+        <div className="space-y-2 text-xs font-mono">
+          <div>
+            <span className="text-warning">Found 0 closest peers</span>
+            <span className="text-text-muted ml-2">— normal until another node is running; does not block task processing</span>
+          </div>
+          <div>
+            <span className="text-text-muted">No available V2 tasks</span>
+            <span className="text-text-muted ml-2">— all current tasks are expired or completed; submit a new one from the dashboard</span>
+          </div>
+        </div>
       </div>
 
       <Card padding="md" className="border-success/30 bg-success/5">

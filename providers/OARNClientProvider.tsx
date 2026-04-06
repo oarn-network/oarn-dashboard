@@ -198,7 +198,7 @@ export class OARNClient {
   async getTask(taskId: number): Promise<Task | null> {
     try {
       const result = await this.pc.readContract({
-        address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+        address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
         abi: TASK_REGISTRY_ABI,
         functionName: 'tasks',
         args: [BigInt(taskId)],
@@ -233,7 +233,7 @@ export class OARNClient {
 
   async getTaskCount(): Promise<number> {
     const count = await this.pc.readContract({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'taskCount',
     });
@@ -245,7 +245,7 @@ export class OARNClient {
 
     try {
       const logs = await this.pc.getLogs({
-        address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+        address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
         event: parseAbiItem('event TaskCreated(uint256 indexed taskId, address indexed requester, bytes32 modelHash, uint256 rewardPerNode, uint256 requiredNodes, uint8 consensusType)'),
         args: { taskId: BigInt(taskId) },
         fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
@@ -283,7 +283,7 @@ export class OARNClient {
 
   async getConsensusStatus(taskId: number): Promise<ConsensusStatus> {
     const result = await this.pc.readContract({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'getConsensusStatus',
       args: [BigInt(taskId)],
@@ -304,7 +304,7 @@ export class OARNClient {
   async getTaskNodes(taskId: number): Promise<string[]> {
     // Derive node addresses from TaskClaimed events for this task
     const events = await this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
       args: { taskId: BigInt(taskId) },
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
@@ -315,7 +315,7 @@ export class OARNClient {
 
   async getTasksByNode(nodeAddress: string): Promise<Task[]> {
     const events = await this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
       args: { node: nodeAddress as `0x${string}` },
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
@@ -349,7 +349,7 @@ export class OARNClient {
   async getActiveProviders(): Promise<string[]> {
     // Derive unique node addresses from RewardDistributed events (nodes that have done real work)
     const events = await this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event RewardDistributed(uint256 indexed taskId, address indexed node, uint256 amount, bool matchedConsensus)'),
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
       toBlock: 'latest',
@@ -374,7 +374,7 @@ export class OARNClient {
 
   async getRewardDistributedEvents(nodeAddress?: string) {
     return this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event RewardDistributed(uint256 indexed taskId, address indexed node, uint256 amount, bool matchedConsensus)'),
       args: nodeAddress ? { node: nodeAddress as `0x${string}` } : undefined,
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
@@ -384,7 +384,7 @@ export class OARNClient {
 
   async getTaskFundedEvents(funderAddress?: string) {
     return this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event TaskFunded(uint256 indexed taskId, address indexed funder, uint256 fundingAmount, uint256 newRewardPerNode)'),
       args: funderAddress ? { funder: funderAddress as `0x${string}` } : undefined,
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
@@ -399,7 +399,7 @@ export class OARNClient {
 
   async getTaskCreatedEvents() {
     return this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event TaskCreated(uint256 indexed taskId, address indexed requester, bytes32 modelHash, uint256 rewardPerNode, uint256 requiredNodes, uint8 consensusType)'),
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
       toBlock: 'latest',
@@ -408,7 +408,7 @@ export class OARNClient {
 
   async getTaskClaimedEvents(taskId?: number) {
     return this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
       args: taskId !== undefined ? { taskId: BigInt(taskId) } : undefined,
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
@@ -418,7 +418,7 @@ export class OARNClient {
 
   async getResultSubmittedEvents(nodeAddress?: string) {
     return this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event ResultSubmitted(uint256 indexed taskId, address indexed node, bytes32 resultHash)'),
       args: nodeAddress ? { node: nodeAddress as `0x${string}` } : undefined,
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
@@ -428,7 +428,7 @@ export class OARNClient {
 
   async getConsensusReachedEvents() {
     return this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event ConsensusReached(uint256 indexed taskId, bytes32 consensusHash, uint256 agreeingNodes, uint256 totalNodes)'),
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
       toBlock: 'latest',
@@ -438,7 +438,7 @@ export class OARNClient {
   /** Parse modelRequirements JSON from submitTask calldata and tally by framework. */
   async getModelFrameworks(): Promise<Record<string, number>> {
     const logs = await this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       event: parseAbiItem('event TaskCreated(uint256 indexed taskId, address indexed requester, bytes32 modelHash, uint256 rewardPerNode, uint256 requiredNodes, uint8 consensusType)'),
       fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
       toBlock: 'latest',
@@ -517,7 +517,7 @@ export class OARNClient {
   async claimTask(taskId: number): Promise<{ hash: string }> {
     this.requireWallet();
     const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'claimTask',
       args: [BigInt(taskId)],
@@ -528,7 +528,7 @@ export class OARNClient {
   async submitResult(taskId: number, resultHash: string): Promise<{ hash: string }> {
     this.requireWallet();
     const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'submitResult',
       args: [BigInt(taskId), resultHash as `0x${string}`],
@@ -543,7 +543,7 @@ export class OARNClient {
   async fundTask(taskId: number, amount: bigint): Promise<{ hash: string }> {
     this.requireWallet();
     const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'fundTask',
       args: [BigInt(taskId)],
@@ -564,7 +564,7 @@ export class OARNClient {
     } = options;
     const totalReward = rewardPerNode * BigInt(requiredNodes);
     const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'submitTask',
       args: [
@@ -585,7 +585,7 @@ export class OARNClient {
   async getContinuousInfo(parentTaskId: number): Promise<ContinuousTaskInfo | null> {
     try {
       const result = await this.pc.readContract({
-        address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+        address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
         abi: TASK_REGISTRY_ABI,
         functionName: 'getContinuousInfo',
         args: [BigInt(parentTaskId)],
@@ -620,7 +620,7 @@ export class OARNClient {
     } = options;
     const roundCost = rewardPerNode * BigInt(requiredNodes);
     const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'submitTaskContinuous',
       args: [
@@ -642,7 +642,7 @@ export class OARNClient {
   async triggerNextRound(parentTaskId: number, roundCost: bigint): Promise<{ hash: string }> {
     this.requireWallet();
     const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'triggerNextRound',
       args: [BigInt(parentTaskId)],
@@ -654,7 +654,7 @@ export class OARNClient {
   async stopContinuousTask(parentTaskId: number): Promise<{ hash: string }> {
     this.requireWallet();
     const hash = await this._writeContractAsync!({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY as `0x${string}`,
+      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
       abi: TASK_REGISTRY_ABI,
       functionName: 'stopContinuousTask',
       args: [BigInt(parentTaskId)],

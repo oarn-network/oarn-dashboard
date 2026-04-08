@@ -267,13 +267,23 @@ export class OARNClient {
   async getTasks(filter?: TaskFilter): Promise<Task[]> {
     const taskCount = await this.getTaskCount();
     const allTasks: Task[] = [];
+    const nowSec = Math.floor(Date.now() / 1000);
 
     for (let i = 1; i <= taskCount; i++) {
       const task = await this.getTask(i);
       if (!task) continue;
-      if (filter?.status !== undefined && task.status !== filter.status) continue;
-      if (filter?.requester && task.requester.toLowerCase() !== filter.requester.toLowerCase()) continue;
-      allTasks.push(task);
+
+      // Treat Pending/Active tasks past their deadline as Expired (contract never updates status proactively)
+      const effectiveStatus =
+        (task.status === TaskStatus.Pending || task.status === TaskStatus.Active) &&
+        task.deadline < nowSec
+          ? TaskStatus.Expired
+          : task.status;
+      const effectiveTask = effectiveStatus !== task.status ? { ...task, status: effectiveStatus } : task;
+
+      if (filter?.status !== undefined && effectiveTask.status !== filter.status) continue;
+      if (filter?.requester && effectiveTask.requester.toLowerCase() !== filter.requester.toLowerCase()) continue;
+      allTasks.push(effectiveTask);
     }
 
     let result = allTasks;

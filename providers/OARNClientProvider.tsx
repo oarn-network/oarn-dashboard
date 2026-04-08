@@ -207,7 +207,7 @@ export class OARNClient {
       // Full struct (14 fields): id, requester, modelHash, inputHash, modelRequirements,
       // rewardPerNode, requiredNodes, claimedCount, submittedCount, deadline,
       // status, consensusType, createdAt, consensusResult
-      const [id, requester, modelHash, inputHash, , rewardPerNode, requiredNodes, , , deadline, status, consensusType] =
+      const [id, requester, modelHash, inputHash, , rewardPerNode, requiredNodes, claimedCount, , deadline, status, consensusType] =
         result as unknown as readonly [bigint, `0x${string}`, `0x${string}`, `0x${string}`, string, bigint, bigint, bigint, bigint, bigint, number, number, bigint, `0x${string}`];
 
       // Skip zero-address tasks (non-existent)
@@ -222,6 +222,7 @@ export class OARNClient {
         inputHash,
         rewardPerNode,
         requiredNodes: Number(requiredNodes),
+        completedNodes: Number(claimedCount),
         deadline: Number(deadline),
         status: status as TaskStatus,
         consensusType: consensusType as ConsensusType,

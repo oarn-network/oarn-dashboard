@@ -347,15 +347,28 @@ export class OARNClient {
   }
 
   async getActiveProviders(): Promise<string[]> {
-    // Derive unique node addresses from RewardDistributed events (nodes that have done real work)
-    const events = await this.pc.getLogs({
-      address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
-      event: parseAbiItem('event RewardDistributed(uint256 indexed taskId, address indexed node, uint256 amount, bool matchedConsensus)'),
-      fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
-      toBlock: 'latest',
-    });
+    // Derive unique node addresses from both TaskClaimed and RewardDistributed events.
+    // TaskClaimed captures nodes that are actively working (even before rewards are paid).
+    const [claimedEvents, rewardEvents] = await Promise.all([
+      this.pc.getLogs({
+        address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
+        event: parseAbiItem('event TaskClaimed(uint256 indexed taskId, address indexed node)'),
+        fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+        toBlock: 'latest',
+      }),
+      this.pc.getLogs({
+        address: CONTRACT_ADDRESSES.TASK_REGISTRY_V2 as `0x${string}`,
+        event: parseAbiItem('event RewardDistributed(uint256 indexed taskId, address indexed node, uint256 amount, bool matchedConsensus)'),
+        fromBlock: TASK_REGISTRY_DEPLOY_BLOCK,
+        toBlock: 'latest',
+      }),
+    ]);
     const unique = new Set<string>();
-    for (const e of events) {
+    for (const e of claimedEvents) {
+      const node = e.args?.node;
+      if (node) unique.add(node.toLowerCase());
+    }
+    for (const e of rewardEvents) {
       const node = e.args?.node;
       if (node) unique.add(node.toLowerCase());
     }
